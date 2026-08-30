@@ -7,11 +7,18 @@
   "engines": {
     "node": ">=20"
   },
-  "scripts": {},
+  "bin": {
+    "creator": "./dist/cli/creator.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
   "dependencies": {
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/node": "^20.17.30",
     "typescript": "^5.8.3"
   }
 }

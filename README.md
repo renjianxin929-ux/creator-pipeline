@@ -35,3 +35,25 @@ P0 — four tickets, one session allowed, four commits, then stop for R1.
 | Founder | Ren | Freeze principles, review preview, approve publish |
 | PM | Grok | Split each contract slice into four tickets |
 | Executor | Codex | Implement the current batch only |
+
+## P0 CLI
+
+Install dependencies and build the local CLI:
+
+```bash
+npm install
+npm run build
+npm link
+```
+
+The linked `creator` command supports only the P0 host commands:
+
+```bash
+creator doctor
+creator init demo
+creator status demo
+```
+
+`creator init` writes structured project state under `./workspace/projects/<slug>/`.
+To use a different workspace, create a local `creator.config.json` with a
+non-secret `workspace` value, for example `{ "workspace": "../creator-workspace" }`.
