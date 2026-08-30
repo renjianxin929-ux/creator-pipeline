@@ -11,12 +11,17 @@ import {
   projectIdentitySchema,
   projectSlugSchema,
   projectStateSchema,
+  renderSrt,
+  silenceMapSchema,
+  transcriptDocumentSchema,
   assertTransition,
   type EventRecord,
   type MediaRecord,
   type ProjectIdentity,
   type ProjectState,
   type ProjectStateValue,
+  type SilenceMap,
+  type TranscriptDocument,
 } from "../contracts/index.js";
 
 const projectDirectoryNames = [
@@ -197,6 +202,27 @@ export function appendProjectEvent(slugInput: string, event: EventRecord, cwd = 
     `${JSON.stringify(record)}\n`,
     "utf8",
   );
+}
+
+/** Writes only Creator Pipeline's normalized transcription artifacts. */
+export function writeProjectTranscriptionArtifacts(
+  slugInput: string,
+  transcript: TranscriptDocument,
+  silenceMap: SilenceMap,
+  cwd = process.cwd(),
+): void {
+  const slug = requireSlug(slugInput);
+  const parsedTranscript = transcriptDocumentSchema.parse(transcript);
+  const parsedSilenceMap = silenceMapSchema.parse(silenceMap);
+
+  if (parsedSilenceMap.source_media_id !== parsedTranscript.source_media_id) {
+    throw new ProjectStoreError("Silence map source_media_id must match transcript source_media_id");
+  }
+
+  const derivedDirectory = join(resolveProjectDirectory(slug, cwd), "derived");
+  writeJson(join(derivedDirectory, "transcript.json"), parsedTranscript);
+  writeFileSync(join(derivedDirectory, "transcript.srt"), renderSrt(parsedTranscript.segments), "utf8");
+  writeJson(join(derivedDirectory, "silence-map.json"), parsedSilenceMap);
 }
 
 function requireSlug(input: string): string {

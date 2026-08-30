@@ -29,13 +29,10 @@ export const projectStateSchema = z
 
 export type ProjectState = z.infer<typeof projectStateSchema>;
 
-/**
- * P0 deliberately defines only transitions out of CREATED. Future tickets
- * extend the table instead of bypassing this contract.
- */
+/** Future tickets extend this table instead of bypassing state validation. */
 export const transitionTable: Readonly<Record<ProjectStateValue, readonly ProjectStateValue[]>> = {
   CREATED: ["INGESTED", "FAILED", "WAITING_USER_ACTION", "WAITING_PROVIDER"],
-  INGESTED: [],
+  INGESTED: ["TRANSCRIBED", "FAILED", "WAITING_USER_ACTION"],
   TRANSCRIBED: [],
   ASSET_PLAN_READY: [],
   ASSETS_READY: [],

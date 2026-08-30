@@ -3,13 +3,16 @@
 import { runDoctor } from "./doctor.js";
 import { ingestMedia } from "../ingest/ingest-media.js";
 import { initializeProject, ProjectStoreError, readProjectState } from "../project/project-store.js";
+import { selectDefaultTranscribeAdapter } from "../transcribe/adapter-selection.js";
+import { transcribeProject } from "../transcribe/transcribe-project.js";
 
-const helpText = `Creator Pipeline P1 CLI
+const helpText = `Creator Pipeline P2 CLI
 
 Usage:
   creator doctor
   creator init <slug>
   creator ingest <slug> <path...>
+  creator transcribe <slug>
   creator status <slug>`;
 
 async function main(arguments_: readonly string[]): Promise<number> {
@@ -31,6 +34,9 @@ async function main(arguments_: readonly string[]): Promise<number> {
       case "ingest":
         requireMinimumArgumentCount(command, argumentsForCommand, 2);
         return ingest(argumentsForCommand[0]!, argumentsForCommand.slice(1));
+      case "transcribe":
+        requireArgumentCount(command, argumentsForCommand, 1);
+        return transcribe(argumentsForCommand[0]!);
       case "status":
         requireArgumentCount(command, argumentsForCommand, 1);
         return status(argumentsForCommand[0]!);
@@ -81,6 +87,13 @@ async function ingest(slug: string, inputPaths: readonly string[]): Promise<numb
   }
 
   return result.failures.length === 0 ? 0 : 1;
+}
+
+async function transcribe(slug: string): Promise<number> {
+  const selection = selectDefaultTranscribeAdapter();
+  const result = await transcribeProject(slug, selection.adapter, selection.unavailable_reason);
+  write(`TRANSCRIBED ${slug} ${result.media.id} ${result.adapter_id}`);
+  return 0;
 }
 
 function requireArgumentCount(command: string, argumentsForCommand: readonly string[], count: number): void {
