@@ -3,6 +3,26 @@ export {
   projectSlugSchema,
   type ProjectIdentity,
 } from "./project.js";
+export {
+  brandDefaultsSchema,
+  brandKitSchema,
+  brandOverrideSchema,
+  brandTemplateDefaultsSchema,
+  brandTemplateRegistrySchema,
+  brandTokensSchema,
+  brandVersionSchema,
+  colorTokensSchema,
+  resolveBrand,
+  safeAreaTokensSchema,
+  spacingTokensSchema,
+  templateIdSchema,
+  templateIdValues,
+  typographyTokensSchema,
+  type BrandKit,
+  type BrandOverride,
+  type ResolvedBrand,
+  type TemplateId,
+} from "./brand.js";
 export { eventRecordSchema, type EventRecord } from "./event.js";
 export {
   renderSrt,
