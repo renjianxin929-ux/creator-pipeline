@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { loadCurrentBrandKit } from "../brand/loader.js";
 import {
+  createDefaultProjectGenerationBudget,
   createInitialState,
   eventRecordSchema,
   mediaRecordListSchema,
@@ -97,6 +98,7 @@ export function initializeProject(slugInput: string, cwd = process.cwd()): Initi
     slug,
     created_at: createdAt,
     brand_version: defaultBrandVersion,
+    budget: createDefaultProjectGenerationBudget(),
   });
   const state = createInitialState();
   const event = eventRecordSchema.parse({

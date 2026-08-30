@@ -24,6 +24,11 @@ describe("project initialization", () => {
       id: expect.any(String),
       slug: "demo",
       created_at: expect.any(String),
+      budget: {
+        generation_cash_cny: 10,
+        used_cash_cny: 0,
+        subscription_generation_count: 0,
+      },
     });
     expect(JSON.parse(readFileSync(join(project.directory, "state.json"), "utf8"))).toEqual({
       status: "CREATED",

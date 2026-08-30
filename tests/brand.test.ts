@@ -81,6 +81,11 @@ describe("P3 versioned kit loader", () => {
       brand_version: "1.0",
       brand_override: { caption_max_lines: 3 },
       brand_templates: { layout: "layout.screen-demo" },
+      budget: {
+        generation_cash_cny: 10,
+        used_cash_cny: 0,
+        subscription_generation_count: 0,
+      },
     });
 
     const resolvedV10 = resolveSnapshot(project, loadBrandKit("1.0", fixtureCwd));

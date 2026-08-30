@@ -5,6 +5,7 @@ import {
   brandTemplateSelectionSchema,
   brandVersionSchema,
 } from "./brand.js";
+import { projectGenerationBudgetSchema } from "./assets.js";
 
 export const projectSlugSchema = z
   .string()
@@ -18,6 +19,7 @@ export const projectIdentitySchema = z
     brand_version: brandVersionSchema.optional(),
     brand_override: brandOverrideSchema.optional(),
     brand_templates: brandTemplateSelectionSchema.optional(),
+    budget: projectGenerationBudgetSchema,
   })
   .strict();
 
