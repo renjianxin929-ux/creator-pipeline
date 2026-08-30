@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { loadCurrentBrandKit } from "../brand/loader.js";
 import {
+  assetManifestSchema,
   assetPlanSchema,
   createDefaultProjectGenerationBudget,
   createInitialState,
@@ -12,6 +13,7 @@ import {
   mediaRecordListSchema,
   mediaRecordSchema,
   projectIdentitySchema,
+  projectGenerationBudgetSchema,
   projectSlugSchema,
   projectStateSchema,
   renderSrt,
@@ -19,9 +21,11 @@ import {
   transcriptDocumentSchema,
   assertTransition,
   type EventRecord,
+  type AssetManifest,
   type AssetPlan,
   type MediaRecord,
   type ProjectIdentity,
+  type ProjectGenerationBudget,
   type ProjectState,
   type ProjectStateValue,
   type SilenceMap,
@@ -289,6 +293,50 @@ export function writeProjectAssetPlan(slugInput: string, plan: AssetPlan, cwd = 
   }
 
   writeJson(join(resolveProjectDirectory(slug, cwd), "plans", "asset-plan.json"), parsed);
+}
+
+export function readProjectAssetManifest(slugInput: string, cwd = process.cwd()): AssetManifest {
+  const slug = requireSlug(slugInput);
+  const manifestPath = join(resolveProjectDirectory(slug, cwd), "assets", "manifest.json");
+
+  if (!existsSync(manifestPath)) {
+    return { version: 1, assets: [] };
+  }
+
+  let rawManifest: unknown;
+  try {
+    rawManifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid asset manifest for: ${slug}`);
+  }
+
+  const parsed = assetManifestSchema.safeParse(rawManifest);
+  if (!parsed.success) {
+    throw new ProjectStoreError(`Invalid asset manifest for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function writeProjectAssetManifest(slugInput: string, manifest: AssetManifest, cwd = process.cwd()): void {
+  const slug = requireSlug(slugInput);
+  const parsed = assetManifestSchema.parse(manifest);
+  writeJson(join(resolveProjectDirectory(slug, cwd), "assets", "manifest.json"), parsed);
+}
+
+export function writeProjectGenerationBudget(
+  slugInput: string,
+  budget: ProjectGenerationBudget,
+  cwd = process.cwd(),
+): ProjectIdentity {
+  const slug = requireSlug(slugInput);
+  const identity = readProjectIdentity(slug, cwd);
+  const next = projectIdentitySchema.parse({
+    ...identity,
+    budget: projectGenerationBudgetSchema.parse(budget),
+  });
+  writeJson(join(resolveProjectDirectory(slug, cwd), "project.json"), next);
+  return next;
 }
 
 /** Writes only Creator Pipeline's normalized transcription artifacts. */

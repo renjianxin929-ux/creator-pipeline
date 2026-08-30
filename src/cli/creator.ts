@@ -2,6 +2,7 @@
 
 import { runDoctor } from "./doctor.js";
 import { planProjectAssets } from "../assets/asset-planner.js";
+import { generateProjectAssets } from "../assets/generate-assets.js";
 import { resolveProjectBrand } from "../brand/project-brand.js";
 import { ingestMedia } from "../ingest/ingest-media.js";
 import { initializeProject, ProjectStoreError, readProjectState } from "../project/project-store.js";
@@ -17,6 +18,7 @@ Usage:
   creator ingest <slug> <path...>
   creator transcribe <slug>
   creator assets plan <slug>
+  creator assets generate <slug>
   creator status <slug>`;
 
 async function main(arguments_: readonly string[]): Promise<number> {
@@ -122,15 +124,26 @@ async function transcribe(slug: string): Promise<number> {
   return 0;
 }
 
-function assets(argumentsForCommand: readonly string[]): number {
+async function assets(argumentsForCommand: readonly string[]): Promise<number> {
   const [subcommand, slug, ...remaining] = argumentsForCommand;
-  if (subcommand !== "plan" || slug === undefined || remaining.length !== 0) {
-    throw new CliError("Usage: creator assets plan <slug>");
+  if (slug === undefined || remaining.length !== 0) {
+    throw new CliError("Usage: creator assets <plan|generate> <slug>");
   }
 
-  const plan = planProjectAssets(slug);
-  write(`ASSET_PLAN_READY ${slug} ${plan.requests.length}`);
-  return 0;
+  switch (subcommand) {
+    case "plan": {
+      const plan = planProjectAssets(slug);
+      write(`ASSET_PLAN_READY ${slug} ${plan.requests.length}`);
+      return 0;
+    }
+    case "generate": {
+      const result = await generateProjectAssets(slug);
+      write(`${result.status} ${slug} ${result.manifest.assets.length}`);
+      return 0;
+    }
+    default:
+      throw new CliError("Usage: creator assets <plan|generate> <slug>");
+  }
 }
 
 function requireArgumentCount(command: string, argumentsForCommand: readonly string[], count: number): void {

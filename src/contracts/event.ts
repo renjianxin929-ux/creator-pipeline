@@ -11,6 +11,7 @@ export const eventRecordSchema = z
     event: z.string().min(1),
     project: z.string().min(1),
     provider: z.string().min(1).optional(),
+    request_id: z.string().min(1).optional(),
   })
   .strict();
 
