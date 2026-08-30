@@ -1,0 +1,10 @@
+{
+  "font_family": [
+    "Arial",
+    "Helvetica Neue",
+    "sans-serif"
+  ],
+  "font_weight_regular": 400,
+  "font_weight_semibold": 600,
+  "font_weight_bold": 700
+}
