@@ -5,6 +5,20 @@ export {
 } from "./project.js";
 export { eventRecordSchema, type EventRecord } from "./event.js";
 export {
+  renderSrt,
+  silenceIntervalSchema,
+  silenceMapSchema,
+  silenceReasonSchema,
+  silenceReasonValues,
+  transcriptDocumentSchema,
+  transcriptSegmentSchema,
+  type SilenceInterval,
+  type SilenceMap,
+  type SilenceReason,
+  type TranscriptDocument,
+  type TranscriptSegment,
+} from "./transcript.js";
+export {
   mediaIdFromSha256,
   mediaKindSchema,
   mediaKindValues,
