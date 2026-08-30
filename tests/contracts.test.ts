@@ -13,6 +13,9 @@ describe("P0 state contracts", () => {
     expect(() => assertTransition("CREATED", "TRANSCRIBED")).toThrow(
       "Illegal project state transition",
     );
+    expect(() => assertTransition("INGESTED", "PREVIEW_READY")).toThrow(
+      "Illegal project state transition",
+    );
   });
 
   it("creates the only valid initial state", () => {
