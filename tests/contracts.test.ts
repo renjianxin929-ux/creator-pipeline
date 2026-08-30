@@ -34,6 +34,18 @@ describe("P2 state contracts", () => {
   });
 });
 
+describe("P4 state contracts", () => {
+  it("opens only asset planning and collection transitions", () => {
+    expect(() => assertTransition("TRANSCRIBED", "ASSET_PLAN_READY")).not.toThrow();
+    expect(() => assertTransition("TRANSCRIBED", "WAITING_USER_ACTION")).not.toThrow();
+    expect(() => assertTransition("ASSET_PLAN_READY", "ASSETS_READY")).not.toThrow();
+    expect(() => assertTransition("ASSET_PLAN_READY", "WAITING_USER_ACTION")).not.toThrow();
+    expect(() => assertTransition("ASSET_PLAN_READY", "PREVIEW_READY")).toThrow(
+      "Illegal project state transition",
+    );
+  });
+});
+
 describe("event contract", () => {
   it("accepts structured operational events and rejects unbounded fields", () => {
     const event = {

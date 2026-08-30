@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
 import { runDoctor } from "./doctor.js";
+import { planProjectAssets } from "../assets/asset-planner.js";
 import { resolveProjectBrand } from "../brand/project-brand.js";
 import { ingestMedia } from "../ingest/ingest-media.js";
 import { initializeProject, ProjectStoreError, readProjectState } from "../project/project-store.js";
 import { selectDefaultTranscribeAdapter } from "../transcribe/adapter-selection.js";
 import { transcribeProject } from "../transcribe/transcribe-project.js";
 
-const helpText = `Creator Pipeline P3 CLI
+const helpText = `Creator Pipeline P4 CLI
 
 Usage:
   creator doctor
@@ -15,6 +16,7 @@ Usage:
   creator brand <slug>
   creator ingest <slug> <path...>
   creator transcribe <slug>
+  creator assets plan <slug>
   creator status <slug>`;
 
 async function main(arguments_: readonly string[]): Promise<number> {
@@ -42,6 +44,8 @@ async function main(arguments_: readonly string[]): Promise<number> {
       case "transcribe":
         requireArgumentCount(command, argumentsForCommand, 1);
         return transcribe(argumentsForCommand[0]!);
+      case "assets":
+        return assets(argumentsForCommand);
       case "status":
         requireArgumentCount(command, argumentsForCommand, 1);
         return status(argumentsForCommand[0]!);
@@ -115,6 +119,17 @@ async function transcribe(slug: string): Promise<number> {
   const selection = selectDefaultTranscribeAdapter();
   const result = await transcribeProject(slug, selection.adapter, selection.unavailable_reason);
   write(`TRANSCRIBED ${slug} ${result.media.id} ${result.adapter_id}`);
+  return 0;
+}
+
+function assets(argumentsForCommand: readonly string[]): number {
+  const [subcommand, slug, ...remaining] = argumentsForCommand;
+  if (subcommand !== "plan" || slug === undefined || remaining.length !== 0) {
+    throw new CliError("Usage: creator assets plan <slug>");
+  }
+
+  const plan = planProjectAssets(slug);
+  write(`ASSET_PLAN_READY ${slug} ${plan.requests.length}`);
   return 0;
 }
 

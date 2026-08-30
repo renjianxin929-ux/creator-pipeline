@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { loadCurrentBrandKit } from "../brand/loader.js";
 import {
+  assetPlanSchema,
   createDefaultProjectGenerationBudget,
   createInitialState,
   eventRecordSchema,
@@ -18,6 +19,7 @@ import {
   transcriptDocumentSchema,
   assertTransition,
   type EventRecord,
+  type AssetPlan,
   type MediaRecord,
   type ProjectIdentity,
   type ProjectState,
@@ -231,6 +233,62 @@ export function appendProjectEvent(slugInput: string, event: EventRecord, cwd = 
     `${JSON.stringify(record)}\n`,
     "utf8",
   );
+}
+
+export function readProjectTranscript(slugInput: string, cwd = process.cwd()): TranscriptDocument | undefined {
+  const slug = requireSlug(slugInput);
+  const transcriptPath = join(resolveProjectDirectory(slug, cwd), "derived", "transcript.json");
+
+  if (!existsSync(transcriptPath)) {
+    return undefined;
+  }
+
+  let rawTranscript: unknown;
+  try {
+    rawTranscript = JSON.parse(readFileSync(transcriptPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid transcript for: ${slug}`);
+  }
+
+  const parsed = transcriptDocumentSchema.safeParse(rawTranscript);
+  if (!parsed.success) {
+    throw new ProjectStoreError(`Invalid transcript for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function readProjectAssetPlan(slugInput: string, cwd = process.cwd()): AssetPlan | undefined {
+  const slug = requireSlug(slugInput);
+  const planPath = join(resolveProjectDirectory(slug, cwd), "plans", "asset-plan.json");
+
+  if (!existsSync(planPath)) {
+    return undefined;
+  }
+
+  let rawPlan: unknown;
+  try {
+    rawPlan = JSON.parse(readFileSync(planPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid asset plan for: ${slug}`);
+  }
+
+  const parsed = assetPlanSchema.safeParse(rawPlan);
+  if (!parsed.success || parsed.data.project_slug !== slug) {
+    throw new ProjectStoreError(`Invalid asset plan for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function writeProjectAssetPlan(slugInput: string, plan: AssetPlan, cwd = process.cwd()): void {
+  const slug = requireSlug(slugInput);
+  const parsed = assetPlanSchema.parse(plan);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Asset plan project_slug must match the target project");
+  }
+
+  writeJson(join(resolveProjectDirectory(slug, cwd), "plans", "asset-plan.json"), parsed);
 }
 
 /** Writes only Creator Pipeline's normalized transcription artifacts. */
