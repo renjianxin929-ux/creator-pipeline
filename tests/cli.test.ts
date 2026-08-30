@@ -1,6 +1,7 @@
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -54,6 +55,38 @@ describe("creator CLI", () => {
 
     expect(doctor.status).toBe(0);
     expect(doctor.stdout).toContain("WARN minimax disabled");
+  });
+
+  it("binds a new project to the current brand and resolves it without copying the kit", () => {
+    const cwd = createTemporaryDirectory();
+    writeFileSync(
+      join(cwd, "creator.config.json"),
+      JSON.stringify({ workspace: "./temporary-workspace" }),
+      "utf8",
+    );
+    const kitColorsPath = resolve(process.cwd(), "brand", "v1.0", "tokens", "colors.json");
+    const kitBefore = readFileSync(kitColorsPath, "utf8");
+
+    expect(runCreator(cwd, ["init", "brand-demo"]).status).toBe(0);
+    const projectDirectory = join(cwd, "temporary-workspace", "projects", "brand-demo");
+    const projectPath = join(projectDirectory, "project.json");
+    const project = JSON.parse(readFileSync(projectPath, "utf8")) as Record<string, unknown>;
+    expect(project.brand_version).toBe("1.0");
+
+    project.brand_override = { colors: { accent: "#ef4444" }, caption_max_lines: 3 };
+    project.brand_templates = { layout: "layout.screen-demo" };
+    writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`, "utf8");
+
+    const brand = runCreator(cwd, ["brand", "brand-demo"]);
+    expect(brand.status).toBe(0);
+    expect(JSON.parse(brand.stdout)).toMatchObject({
+      brand_version: "1.0",
+      template_defaults: { layout: "layout.screen-demo" },
+      brand_override: { caption_max_lines: 3 },
+    });
+    expect(brand.stdout).toContain("cover.tutorial");
+    expect(readFileSync(kitColorsPath, "utf8")).toBe(kitBefore);
+    expect(existsSync(join(projectDirectory, "brand"))).toBe(false);
   });
 
   it("reports a clean error and preserves CREATED state when ffprobe cannot provide a probe", () => {
