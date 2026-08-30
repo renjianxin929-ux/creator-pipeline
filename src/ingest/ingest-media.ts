@@ -7,6 +7,7 @@ import { mediaIdFromSha256, mediaRecordSchema, type MediaRecord } from "../contr
 import {
   appendProjectEvent,
   appendProjectMediaRecord,
+  readProjectMediaRecords,
   resolveProjectDirectory,
   transitionProjectState,
 } from "../project/project-store.js";
@@ -20,6 +21,7 @@ export interface IngestFailure {
 
 export interface IngestResult {
   ingested: readonly MediaRecord[];
+  duplicate_skipped: readonly MediaRecord[];
   failures: readonly IngestFailure[];
 }
 
@@ -29,12 +31,28 @@ export async function ingestMedia(
   cwd = process.cwd(),
 ): Promise<IngestResult> {
   const projectDirectory = resolveProjectDirectory(slug, cwd);
+  const existingRecords = readProjectMediaRecords(slug, cwd);
   const ingested: MediaRecord[] = [];
+  const duplicateSkipped: MediaRecord[] = [];
   const failures: IngestFailure[] = [];
 
   for (const inputPath of inputPaths) {
     try {
-      const media = await ingestOne(projectDirectory, inputPath, cwd);
+      const source = await inspectSource(inputPath, cwd);
+      const existing = existingRecords.find((record) => record.sha256 === source.sha256);
+
+      if (existing !== undefined) {
+        appendProjectEvent(slug, {
+          ts: new Date().toISOString(),
+          stage: "ingest",
+          event: "ingest_duplicate_skipped",
+          project: slug,
+        }, cwd);
+        duplicateSkipped.push(existing);
+        continue;
+      }
+
+      const media = await ingestOne(projectDirectory, source);
       appendProjectMediaRecord(slug, media, cwd);
       appendProjectEvent(slug, {
         ts: new Date().toISOString(),
@@ -43,6 +61,7 @@ export async function ingestMedia(
         project: slug,
       }, cwd);
       ingested.push(media);
+      existingRecords.push(media);
     } catch (error) {
       failures.push({
         input_path: inputPath,
@@ -51,14 +70,20 @@ export async function ingestMedia(
     }
   }
 
-  if (ingested.length > 0) {
+  if (ingested.length > 0 || duplicateSkipped.length > 0) {
     transitionProjectState(slug, "INGESTED", cwd);
   }
 
-  return { ingested, failures };
+  return { ingested, duplicate_skipped: duplicateSkipped, failures };
 }
 
-async function ingestOne(projectDirectory: string, inputPath: string, cwd: string): Promise<MediaRecord> {
+interface IngestSource {
+  source_path: string;
+  byte_size: number;
+  sha256: string;
+}
+
+async function inspectSource(inputPath: string, cwd: string): Promise<IngestSource> {
   const sourcePath = resolve(cwd, inputPath);
   const sourceStat = await stat(sourcePath);
 
@@ -66,19 +91,26 @@ async function ingestOne(projectDirectory: string, inputPath: string, cwd: strin
     throw new Error(`Input is not a file: ${inputPath}`);
   }
 
-  const sha256 = await sha256ForFile(sourcePath);
-  const probe = probeMedia(sourcePath);
-  const kind = classifyMedia(sourcePath, probe);
-  const storedName = `sha256-${sha256}${safeExtension(sourcePath)}`;
+  return {
+    source_path: sourcePath,
+    byte_size: sourceStat.size,
+    sha256: await sha256ForFile(sourcePath),
+  };
+}
+
+async function ingestOne(projectDirectory: string, source: IngestSource): Promise<MediaRecord> {
+  const probe = probeMedia(source.source_path);
+  const kind = classifyMedia(source.source_path, probe);
+  const storedName = `sha256-${source.sha256}${safeExtension(source.source_path)}`;
   const targetPath = join(projectDirectory, "raw", kind, storedName);
 
   await mkdir(dirname(targetPath), { recursive: true });
-  await copyFile(sourcePath, targetPath);
+  await copyFile(source.source_path, targetPath);
 
   return mediaRecordSchema.parse({
-    id: mediaIdFromSha256(sha256),
-    sha256,
-    byte_size: sourceStat.size,
+    id: mediaIdFromSha256(source.sha256),
+    sha256: source.sha256,
+    byte_size: source.byte_size,
     path: toPortableRelativePath(projectDirectory, targetPath),
     kind,
     ...probe,

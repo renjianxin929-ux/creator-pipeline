@@ -72,6 +72,10 @@ async function ingest(slug: string, inputPaths: readonly string[]): Promise<numb
     write(`INGESTED ${slug} ${media.id}`);
   }
 
+  for (const media of result.duplicate_skipped) {
+    write(`SKIPPED ${slug} ${media.id}`);
+  }
+
   for (const failure of result.failures) {
     writeError(`ERROR ${failure.input_path}: ${failure.message}`);
   }
