@@ -1,24 +1,45 @@
+# Dependencies and build output
 node_modules/
+.pnpm-store/
 dist/
 build/
 coverage/
 .DS_Store
 *.log
 
+# Per-project working data is local state, never repository state.
+workspace/
+
+# Local secrets
 .env
 .env.*
 !.env.example
 
-workspace/
+# Browser sessions and profiles must remain local.
+cookies/
+cookies.json
+**/cookies.json
+*.cookies.json
+**/session*.json
+browser-profile/
+browser-profiles/
+.playwright/
+
+# Media belongs in a local workspace. Tiny committed test fixtures are exempt.
 *.mp4
 *.mov
 *.mkv
-*.wav
+*.webm
+*.avi
 *.mp3
+*.wav
+*.m4a
+*.aac
+*.flac
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+!tests/fixtures/
 !tests/fixtures/**
-
-cookies.json
-**/cookies.json
-**/session*.json
-browser-profile/
-.playwright/
