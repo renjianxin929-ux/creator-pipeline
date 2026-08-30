@@ -23,6 +23,17 @@ describe("P0 state contracts", () => {
   });
 });
 
+describe("P2 state contracts", () => {
+  it("opens only the transcription transitions from INGESTED", () => {
+    expect(() => assertTransition("INGESTED", "TRANSCRIBED")).not.toThrow();
+    expect(() => assertTransition("INGESTED", "FAILED")).not.toThrow();
+    expect(() => assertTransition("INGESTED", "WAITING_USER_ACTION")).not.toThrow();
+    expect(() => assertTransition("INGESTED", "PREVIEW_READY")).toThrow(
+      "Illegal project state transition",
+    );
+  });
+});
+
 describe("event contract", () => {
   it("accepts structured operational events and rejects unbounded fields", () => {
     const event = {
