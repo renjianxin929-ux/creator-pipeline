@@ -1,16 +1,22 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 
 import {
   createInitialState,
   eventRecordSchema,
+  mediaRecordListSchema,
+  mediaRecordSchema,
   projectIdentitySchema,
   projectSlugSchema,
   projectStateSchema,
+  assertTransition,
+  type EventRecord,
+  type MediaRecord,
   type ProjectIdentity,
   type ProjectState,
+  type ProjectStateValue,
 } from "../contracts/index.js";
 
 const projectDirectoryNames = [
@@ -100,7 +106,7 @@ export function initializeProject(slugInput: string, cwd = process.cwd()): Initi
 
 export function readProjectState(slugInput: string, cwd = process.cwd()): ProjectState {
   const slug = requireSlug(slugInput);
-  const statePath = join(resolveWorkspaceRoot(cwd), "projects", slug, "state.json");
+  const statePath = join(resolveProjectDirectory(slug, cwd), "state.json");
 
   if (!existsSync(statePath)) {
     throw new ProjectStoreError(`Project state does not exist: ${slug}`);
@@ -119,6 +125,78 @@ export function readProjectState(slugInput: string, cwd = process.cwd()): Projec
   }
 
   return parsed.data;
+}
+
+export function resolveProjectDirectory(slugInput: string, cwd = process.cwd()): string {
+  const slug = requireSlug(slugInput);
+  const projectDirectory = join(resolveWorkspaceRoot(cwd), "projects", slug);
+
+  if (!existsSync(projectDirectory)) {
+    throw new ProjectStoreError(`Project does not exist: ${slug}`);
+  }
+
+  return projectDirectory;
+}
+
+export function transitionProjectState(
+  slugInput: string,
+  nextStatus: ProjectStateValue,
+  cwd = process.cwd(),
+): ProjectState {
+  const slug = requireSlug(slugInput);
+  const current = readProjectState(slug, cwd);
+
+  if (current.status === nextStatus) {
+    return current;
+  }
+
+  assertTransition(current.status, nextStatus);
+  const next = projectStateSchema.parse({ status: nextStatus });
+  writeJson(join(resolveProjectDirectory(slug, cwd), "state.json"), next);
+  return next;
+}
+
+export function readProjectMediaRecords(slugInput: string, cwd = process.cwd()): MediaRecord[] {
+  const slug = requireSlug(slugInput);
+  const mediaProbePath = join(resolveProjectDirectory(slug, cwd), "derived", "media-probe.json");
+
+  if (!existsSync(mediaProbePath)) {
+    return [];
+  }
+
+  let rawRecords: unknown;
+  try {
+    rawRecords = JSON.parse(readFileSync(mediaProbePath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid media probe records for: ${slug}`);
+  }
+
+  const parsed = mediaRecordListSchema.safeParse(rawRecords);
+  if (!parsed.success) {
+    throw new ProjectStoreError(`Invalid media probe records for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function appendProjectMediaRecord(slugInput: string, media: MediaRecord, cwd = process.cwd()): void {
+  const slug = requireSlug(slugInput);
+  const record = mediaRecordSchema.parse(media);
+  const records = readProjectMediaRecords(slug, cwd);
+
+  records.push(record);
+  writeJson(join(resolveProjectDirectory(slug, cwd), "derived", "media-probe.json"), records);
+}
+
+export function appendProjectEvent(slugInput: string, event: EventRecord, cwd = process.cwd()): void {
+  const slug = requireSlug(slugInput);
+  const record = eventRecordSchema.parse(event);
+
+  appendFileSync(
+    join(resolveProjectDirectory(slug, cwd), "events.ndjson"),
+    `${JSON.stringify(record)}\n`,
+    "utf8",
+  );
 }
 
 function requireSlug(input: string): string {

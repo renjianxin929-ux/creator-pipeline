@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 
 import { runDoctor } from "./doctor.js";
+import { ingestMedia } from "../ingest/ingest-media.js";
 import { initializeProject, ProjectStoreError, readProjectState } from "../project/project-store.js";
 
-const helpText = `Creator Pipeline P0 CLI
+const helpText = `Creator Pipeline P1 CLI
 
 Usage:
   creator doctor
   creator init <slug>
+  creator ingest <slug> <path...>
   creator status <slug>`;
 
-function main(arguments_: readonly string[]): number {
+async function main(arguments_: readonly string[]): Promise<number> {
   const [command, ...argumentsForCommand] = arguments_;
 
   if (command === undefined || command === "help" || command === "--help" || command === "-h") {
@@ -26,6 +28,9 @@ function main(arguments_: readonly string[]): number {
       case "init":
         requireArgumentCount(command, argumentsForCommand, 1);
         return init(argumentsForCommand[0]!);
+      case "ingest":
+        requireMinimumArgumentCount(command, argumentsForCommand, 2);
+        return ingest(argumentsForCommand[0]!, argumentsForCommand.slice(1));
       case "status":
         requireArgumentCount(command, argumentsForCommand, 1);
         return status(argumentsForCommand[0]!);
@@ -60,9 +65,29 @@ function status(slug: string): number {
   return 0;
 }
 
+async function ingest(slug: string, inputPaths: readonly string[]): Promise<number> {
+  const result = await ingestMedia(slug, inputPaths);
+
+  for (const media of result.ingested) {
+    write(`INGESTED ${slug} ${media.id}`);
+  }
+
+  for (const failure of result.failures) {
+    writeError(`ERROR ${failure.input_path}: ${failure.message}`);
+  }
+
+  return result.failures.length === 0 ? 0 : 1;
+}
+
 function requireArgumentCount(command: string, argumentsForCommand: readonly string[], count: number): void {
   if (argumentsForCommand.length !== count) {
     throw new CliError(`Usage: creator ${command}${count === 1 ? " <slug>" : ""}`);
+  }
+}
+
+function requireMinimumArgumentCount(command: string, argumentsForCommand: readonly string[], count: number): void {
+  if (argumentsForCommand.length < count) {
+    throw new CliError(`Usage: creator ${command} <slug> <path...>`);
   }
 }
 
@@ -78,7 +103,7 @@ class CliError extends Error {
   override name = "CliError";
 }
 
-void Promise.resolve(main(process.argv.slice(2))).then((exitCode) => {
+void main(process.argv.slice(2)).then((exitCode) => {
   process.exitCode = exitCode;
 });
 
