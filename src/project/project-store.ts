@@ -7,6 +7,7 @@ import { loadCurrentBrandKit } from "../brand/loader.js";
 import {
   assetManifestSchema,
   assetPlanSchema,
+  editPlanSchema,
   createDefaultProjectGenerationBudget,
   createInitialState,
   eventRecordSchema,
@@ -23,6 +24,7 @@ import {
   type EventRecord,
   type AssetManifest,
   type AssetPlan,
+  type EditPlan,
   type MediaRecord,
   type ProjectIdentity,
   type ProjectGenerationBudget,
@@ -262,6 +264,29 @@ export function readProjectTranscript(slugInput: string, cwd = process.cwd()): T
   return parsed.data;
 }
 
+export function readProjectSilenceMap(slugInput: string, cwd = process.cwd()): SilenceMap | undefined {
+  const slug = requireSlug(slugInput);
+  const silenceMapPath = join(resolveProjectDirectory(slug, cwd), "derived", "silence-map.json");
+
+  if (!existsSync(silenceMapPath)) {
+    return undefined;
+  }
+
+  let rawSilenceMap: unknown;
+  try {
+    rawSilenceMap = JSON.parse(readFileSync(silenceMapPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid silence map for: ${slug}`);
+  }
+
+  const parsed = silenceMapSchema.safeParse(rawSilenceMap);
+  if (!parsed.success) {
+    throw new ProjectStoreError(`Invalid silence map for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
 export function readProjectAssetPlan(slugInput: string, cwd = process.cwd()): AssetPlan | undefined {
   const slug = requireSlug(slugInput);
   const planPath = join(resolveProjectDirectory(slug, cwd), "plans", "asset-plan.json");
@@ -293,6 +318,35 @@ export function writeProjectAssetPlan(slugInput: string, plan: AssetPlan, cwd = 
   }
 
   writeJson(join(resolveProjectDirectory(slug, cwd), "plans", "asset-plan.json"), parsed);
+}
+
+export function readProjectEditPlan(slugInput: string, cwd = process.cwd()): EditPlan | undefined {
+  const slug = requireSlug(slugInput);
+  const planPath = join(resolveProjectDirectory(slug, cwd), "plans", "edit-plan.json");
+
+  if (!existsSync(planPath)) {
+    return undefined;
+  }
+
+  let rawPlan: unknown;
+  try {
+    rawPlan = JSON.parse(readFileSync(planPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid edit plan for: ${slug}`);
+  }
+
+  const parsed = editPlanSchema.safeParse(rawPlan);
+  if (!parsed.success) {
+    throw new ProjectStoreError(`Invalid edit plan for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function writeProjectEditPlan(slugInput: string, plan: EditPlan, cwd = process.cwd()): void {
+  const slug = requireSlug(slugInput);
+  const parsed = editPlanSchema.parse(plan);
+  writeJson(join(resolveProjectDirectory(slug, cwd), "plans", "edit-plan.json"), parsed);
 }
 
 export function readProjectAssetManifest(slugInput: string, cwd = process.cwd()): AssetManifest {

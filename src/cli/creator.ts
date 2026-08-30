@@ -4,12 +4,14 @@ import { runDoctor } from "./doctor.js";
 import { planProjectAssets } from "../assets/asset-planner.js";
 import { generateProjectAssets } from "../assets/generate-assets.js";
 import { resolveProjectBrand } from "../brand/project-brand.js";
+import { planProjectEdit } from "../edit/edit-planner.js";
 import { ingestMedia } from "../ingest/ingest-media.js";
 import { initializeProject, ProjectStoreError, readProjectState } from "../project/project-store.js";
+import { renderProjectPreview } from "../render/preview-renderer.js";
 import { selectDefaultTranscribeAdapter } from "../transcribe/adapter-selection.js";
 import { transcribeProject } from "../transcribe/transcribe-project.js";
 
-const helpText = `Creator Pipeline P4 CLI
+const helpText = `Creator Pipeline P5 CLI
 
 Usage:
   creator doctor
@@ -19,6 +21,8 @@ Usage:
   creator transcribe <slug>
   creator assets plan <slug>
   creator assets generate <slug>
+  creator edit plan <slug>
+  creator render preview <slug>
   creator status <slug>`;
 
 async function main(arguments_: readonly string[]): Promise<number> {
@@ -48,6 +52,10 @@ async function main(arguments_: readonly string[]): Promise<number> {
         return transcribe(argumentsForCommand[0]!);
       case "assets":
         return assets(argumentsForCommand);
+      case "edit":
+        return edit(argumentsForCommand);
+      case "render":
+        return render(argumentsForCommand);
       case "status":
         requireArgumentCount(command, argumentsForCommand, 1);
         return status(argumentsForCommand[0]!);
@@ -144,6 +152,28 @@ async function assets(argumentsForCommand: readonly string[]): Promise<number> {
     default:
       throw new CliError("Usage: creator assets <plan|generate> <slug>");
   }
+}
+
+function edit(argumentsForCommand: readonly string[]): number {
+  const [subcommand, slug, ...remaining] = argumentsForCommand;
+  if (subcommand !== "plan" || slug === undefined || remaining.length !== 0) {
+    throw new CliError("Usage: creator edit plan <slug>");
+  }
+
+  const plan = planProjectEdit(slug);
+  write(`EDIT_PLAN_READY ${slug} ${plan.timeline.length}`);
+  return 0;
+}
+
+async function render(argumentsForCommand: readonly string[]): Promise<number> {
+  const [subcommand, slug, ...remaining] = argumentsForCommand;
+  if (subcommand !== "preview" || slug === undefined || remaining.length !== 0) {
+    throw new CliError("Usage: creator render preview <slug>");
+  }
+
+  const result = await renderProjectPreview(slug);
+  write(`PREVIEW_READY ${slug} ${result.preview_path}`);
+  return 0;
 }
 
 function requireArgumentCount(command: string, argumentsForCommand: readonly string[], count: number): void {

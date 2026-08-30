@@ -47,12 +47,22 @@ export function CreatorPreview({
   const activeClip = getActiveEditPlanClip(edit_plan, currentMs);
   const activeCaptions = getActivePreviewCaptions(captions, currentMs);
   const zoom = activeClip?.zoom?.enabled ? activeClip.zoom : undefined;
-  const hookOpacity = interpolate(
+  const hookFadeIn = interpolate(
     frame,
-    [0, Math.min(12, durationInFrames), Math.min(90, durationInFrames), Math.min(120, durationInFrames)],
-    [0, 1, 1, 0],
+    [0, Math.max(1, Math.min(12, durationInFrames - 1))],
+    [0, 1],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
+  const hookFadeOut =
+    durationInFrames <= 120
+      ? 1
+      : interpolate(
+          frame,
+          [durationInFrames - 30, durationInFrames - 1],
+          [1, 0],
+          { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+        );
+  const hookOpacity = hookFadeIn * hookFadeOut;
   const fontFamily = brand.tokens.typography.font_family.join(", ");
 
   return (
