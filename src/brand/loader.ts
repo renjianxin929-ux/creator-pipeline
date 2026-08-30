@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 import {
@@ -34,7 +35,12 @@ export class BrandKitError extends Error {
 
 /** Resolves the repository-level versioned brand directory. */
 export function resolveBrandRoot(cwd = process.cwd()): string {
-  return resolve(cwd, "brand");
+  const cwdBrandRoot = resolve(cwd, "brand");
+  if (existsSync(cwdBrandRoot)) {
+    return cwdBrandRoot;
+  }
+
+  return resolve(fileURLToPath(new URL("../../brand/", import.meta.url)));
 }
 
 /** Reads the current pointer and returns its versioned, validated kit. */

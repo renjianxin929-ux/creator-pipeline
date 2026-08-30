@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { join, resolve } from "node:path";
 import { z } from "zod";
 
+import { loadCurrentBrandKit } from "../brand/loader.js";
 import {
   createInitialState,
   eventRecordSchema,
@@ -81,6 +82,8 @@ export function initializeProject(slugInput: string, cwd = process.cwd()): Initi
     throw new ProjectStoreError(`Project already exists: ${slug}`);
   }
 
+  const defaultBrandVersion = loadCurrentBrandKit(cwd).brand_version;
+
   mkdirSync(projectsRoot, { recursive: true });
   mkdirSync(projectDirectory);
 
@@ -93,6 +96,7 @@ export function initializeProject(slugInput: string, cwd = process.cwd()): Initi
     id: randomUUID(),
     slug,
     created_at: createdAt,
+    brand_version: defaultBrandVersion,
   });
   const state = createInitialState();
   const event = eventRecordSchema.parse({
@@ -107,6 +111,29 @@ export function initializeProject(slugInput: string, cwd = process.cwd()): Initi
   writeFileSync(join(projectDirectory, "events.ndjson"), `${JSON.stringify(event)}\n`, "utf8");
 
   return { directory: projectDirectory, identity, state };
+}
+
+export function readProjectIdentity(slugInput: string, cwd = process.cwd()): ProjectIdentity {
+  const slug = requireSlug(slugInput);
+  const projectPath = join(resolveProjectDirectory(slug, cwd), "project.json");
+
+  if (!existsSync(projectPath)) {
+    throw new ProjectStoreError(`Project identity does not exist: ${slug}`);
+  }
+
+  let rawProject: unknown;
+  try {
+    rawProject = JSON.parse(readFileSync(projectPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid project identity for: ${slug}`);
+  }
+
+  const parsed = projectIdentitySchema.safeParse(rawProject);
+  if (!parsed.success) {
+    throw new ProjectStoreError(`Invalid project identity for: ${slug}`);
+  }
+
+  return parsed.data;
 }
 
 export function readProjectState(slugInput: string, cwd = process.cwd()): ProjectState {

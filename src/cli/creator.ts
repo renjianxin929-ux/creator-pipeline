@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 
 import { runDoctor } from "./doctor.js";
+import { resolveProjectBrand } from "../brand/project-brand.js";
 import { ingestMedia } from "../ingest/ingest-media.js";
 import { initializeProject, ProjectStoreError, readProjectState } from "../project/project-store.js";
 import { selectDefaultTranscribeAdapter } from "../transcribe/adapter-selection.js";
 import { transcribeProject } from "../transcribe/transcribe-project.js";
 
-const helpText = `Creator Pipeline P2 CLI
+const helpText = `Creator Pipeline P3 CLI
 
 Usage:
   creator doctor
   creator init <slug>
+  creator brand <slug>
   creator ingest <slug> <path...>
   creator transcribe <slug>
   creator status <slug>`;
@@ -31,6 +33,9 @@ async function main(arguments_: readonly string[]): Promise<number> {
       case "init":
         requireArgumentCount(command, argumentsForCommand, 1);
         return init(argumentsForCommand[0]!);
+      case "brand":
+        requireArgumentCount(command, argumentsForCommand, 1);
+        return brand(argumentsForCommand[0]!);
       case "ingest":
         requireMinimumArgumentCount(command, argumentsForCommand, 2);
         return ingest(argumentsForCommand[0]!, argumentsForCommand.slice(1));
@@ -62,6 +67,23 @@ function doctor(): number {
 function init(slug: string): number {
   const project = initializeProject(slug);
   write(`CREATED ${project.identity.slug} ${project.directory}`);
+  return 0;
+}
+
+function brand(slug: string): number {
+  const resolution = resolveProjectBrand(slug);
+  write(
+    JSON.stringify(
+      {
+        brand_version: resolution.brand.brand_version,
+        templates: resolution.brand.templates.ids,
+        template_defaults: resolution.brand.defaults.templates,
+        brand_override: resolution.project.brand_override ?? {},
+      },
+      null,
+      2,
+    ),
+  );
   return 0;
 }
 

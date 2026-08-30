@@ -130,6 +130,17 @@ export const brandTemplateDefaultsSchema = z
   })
   .strict();
 
+/** Template choices may vary by project, while the registry remains versioned. */
+export const brandTemplateSelectionSchema = z
+  .object({
+    cover: coverTemplateIdSchema.optional(),
+    caption: captionTemplateIdSchema.optional(),
+    title: titleTemplateIdSchema.optional(),
+    layout: layoutTemplateIdSchema.optional(),
+    motion: motionTemplateIdSchema.optional(),
+  })
+  .strict();
+
 export const brandDefaultsSchema = z
   .object({
     templates: brandTemplateDefaultsSchema,
@@ -171,6 +182,7 @@ export const brandOverrideSchema = z
 
 export type BrandOverride = z.infer<typeof brandOverrideSchema>;
 export type ResolvedBrand = BrandKit;
+export type BrandTemplateSelection = z.infer<typeof brandTemplateSelectionSchema>;
 
 /**
  * Resolves a project override into a new brand snapshot. It performs no I/O and
@@ -213,6 +225,38 @@ export function resolveBrand(kitInput: BrandKit, overrideInput: BrandOverride = 
       },
       cover_title_size: override.cover_title_size ?? kit.defaults.cover_title_size,
       caption_max_lines: override.caption_max_lines ?? kit.defaults.caption_max_lines,
+    },
+  });
+}
+
+/** Applies project template choices to a fresh resolved brand snapshot. */
+export function resolveBrandTemplates(
+  brandInput: ResolvedBrand,
+  selectionInput: BrandTemplateSelection = {},
+): ResolvedBrand {
+  const brand = brandKitSchema.parse(brandInput);
+  const selection = brandTemplateSelectionSchema.parse(selectionInput);
+
+  return brandKitSchema.parse({
+    ...brand,
+    tokens: {
+      colors: { ...brand.tokens.colors },
+      typography: {
+        ...brand.tokens.typography,
+        font_family: [...brand.tokens.typography.font_family],
+      },
+      spacing: { ...brand.tokens.spacing },
+      safe_area: { ...brand.tokens.safe_area },
+    },
+    templates: {
+      ids: [...brand.templates.ids],
+    },
+    defaults: {
+      ...brand.defaults,
+      templates: {
+        ...brand.defaults.templates,
+        ...selection,
+      },
     },
   });
 }
