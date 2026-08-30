@@ -87,6 +87,22 @@ export {
   type MediaRecord,
 } from "./media.js";
 export {
+  diffEditPlans,
+  editPlanClipSchema,
+  editPlanFormatSchema,
+  editPlanFormatValues,
+  editPlanLayoutSchema,
+  editPlanSchema,
+  editPlanZoomSchema,
+  parseEditPlan,
+  type EditPlan,
+  type EditPlanClip,
+  type EditPlanDiff,
+  type EditPlanFormat,
+  type EditPlanLayout,
+  type EditPlanZoom,
+} from "./edit-plan.js";
+export {
   assertTransition,
   createInitialState,
   projectStateSchema,
