@@ -1,55 +1,47 @@
 # AGENTS.md
 
 Codex is the only EXECUTOR.
-PM writes tickets. Founder owns gates. Codex does not change product principles.
 
-## Before any code
+## Law
 
-1. Read `README.md`
-2. Read `docs/ROADMAP.md`
-3. Read `docs/ARCHITECTURE.md`
-4. Read `docs/PM_PROTOCOL.md`
-5. Read only the current file in `docs/tickets/`
-6. Implement that ticket only
+1. `docs/CREATOR_PIPELINE_V3_DEVELOPMENT_CONTRACT.md` is the constitution.
+2. `docs/FOUNDER_ADDENDUM.md` overrides only repo location, visibility, and batch cadence.
+3. `docs/tickets/BATCH_*.md` is the only executable scope.
+4. If a ticket and the contract fight, stop and ask. Do not silently pick the ticket.
 
-## Ticket quality bar
+## Before code
 
-A ticket is valid only if all four are true:
+Read, in order: README, constitution, addendum, current batch ticket file.
 
-1. One theme
-2. One independently reviewable commit
-3. Runnable acceptance
-4. Failure does not force a full restart
+If the constitution file is missing or is a stub, stop. Do not invent a replacement contract.
 
-## Hard bans
+## Current cadence
 
-- Do not implement a later batch because the roadmap mentions it
-- Do not rebuild a topic / research / calendar / competitor system
-- Do not call live Grok / MiniMax / Omni / platform publish APIs in P0
+You may finish all four P0 tickets in one session.
+You must still make four commits, one theme each.
+You must not start P1.
+
+## Hard bans (from constitution)
+
+- Do not rebuild topic / research / competitor systems
+- Do not treat Grok website quota as xAI API billing
+- Do not call live Grok / MiniMax / Omni / publish APIs in P0
 - Do not add OpenCut as a runtime dependency
 - Do not store cookies, tokens, or browser profiles
 - Do not make Markdown the source of project state
 - Do not introduce Kafka, Temporal, Kubernetes, or a second orchestrator
-- Do not couple Brand Kit, Provider, Editor, or Publisher into one module
+- Do not import the old social-media platform as a runtime dependency
 
-## Architecture rule
+## After the batch
 
-Depend on contracts, not vendors.
-
-```
-content-package → asset-plan → edit-plan → brand-kit → renderer-adapter → publisher-adapter
-```
-
-If a vendor dies, only its adapter changes.
-
-## After a ticket
-
-Return:
+Return the constitution §44 packet:
 
 1. Files read
-2. Files added or changed
-3. Tests run and result
-4. `git diff --stat`
-5. Commit hash
-6. What is still blocked
-7. What you deliberately did not do
+2. What was treated as legacy / out of scope
+3. New tree
+4. State schema
+5. CLI commands
+6. Test result
+7. `git diff --stat`
+8. Commit hashes (four)
+9. Risks / open questions
