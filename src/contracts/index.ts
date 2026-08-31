@@ -113,6 +113,14 @@ export {
   type PublishValidation,
 } from "./publish.js";
 export {
+  publishObservationSchema,
+  retryBackoffSchema,
+  retryPolicySchema,
+  type PublishObservation,
+  type RetryBackoff,
+  type RetryPolicy,
+} from "./observation.js";
+export {
   diffEditPlans,
   editPlanClipSchema,
   editPlanFormatSchema,
