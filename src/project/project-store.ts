@@ -19,6 +19,7 @@ import {
   projectGenerationBudgetSchema,
   projectSlugSchema,
   projectStateSchema,
+  reuseSnapshotSchema,
   renderSrt,
   silenceMapSchema,
   transcriptDocumentSchema,
@@ -34,6 +35,7 @@ import {
   type ProjectGenerationBudget,
   type ProjectState,
   type ProjectStateValue,
+  type ReuseSnapshot,
   type SilenceMap,
   type TranscriptDocument,
 } from "../contracts/index.js";
@@ -384,6 +386,39 @@ export function writeProjectPublishPlan(slugInput: string, plan: PublishPlan, cw
   }
 
   writeJson(join(resolveProjectDirectory(slug, cwd), "publish", "plan.json"), parsed);
+}
+
+export function readProjectReuseSnapshot(slugInput: string, cwd = process.cwd()): ReuseSnapshot | undefined {
+  const slug = requireSlug(slugInput);
+  const snapshotPath = join(resolveProjectDirectory(slug, cwd), "publish", "reuse-snapshot.json");
+
+  if (!existsSync(snapshotPath)) {
+    return undefined;
+  }
+
+  let rawSnapshot: unknown;
+  try {
+    rawSnapshot = JSON.parse(readFileSync(snapshotPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid reuse snapshot for: ${slug}`);
+  }
+
+  const parsed = reuseSnapshotSchema.safeParse(rawSnapshot);
+  if (!parsed.success || parsed.data.project_slug !== slug) {
+    throw new ProjectStoreError(`Invalid reuse snapshot for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function writeProjectReuseSnapshot(slugInput: string, snapshot: ReuseSnapshot, cwd = process.cwd()): void {
+  const slug = requireSlug(slugInput);
+  const parsed = reuseSnapshotSchema.parse(snapshot);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Reuse snapshot project_slug must match the target project");
+  }
+
+  writeJson(join(resolveProjectDirectory(slug, cwd), "publish", "reuse-snapshot.json"), parsed);
 }
 
 export function readProjectPreviewApproval(slugInput: string, cwd = process.cwd()): PreviewApproval | undefined {

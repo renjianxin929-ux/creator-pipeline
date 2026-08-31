@@ -121,6 +121,10 @@ export {
   type RetryPolicy,
 } from "./observation.js";
 export {
+  reuseSnapshotSchema,
+  type ReuseSnapshot,
+} from "./reuse-snapshot.js";
+export {
   diffEditPlans,
   editPlanClipSchema,
   editPlanFormatSchema,

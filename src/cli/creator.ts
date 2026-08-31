@@ -11,6 +11,7 @@ import { initializeProject, ProjectStoreError, readProjectState } from "../proje
 import { dryRunProjectPublish, planProjectPublish } from "../publish/publish-project.js";
 import { renderProjectPreview } from "../render/preview-renderer.js";
 import { approveProjectPreview } from "../review/approve-preview.js";
+import { createProjectReuseSnapshot } from "../reuse/reuse-snapshot.js";
 import { selectDefaultTranscribeAdapter } from "../transcribe/adapter-selection.js";
 import { transcribeProject } from "../transcribe/transcribe-project.js";
 
@@ -30,6 +31,7 @@ Usage:
   creator export <slug>
   creator publish plan <slug>
   creator publish dry-run <slug>
+  creator snapshot <slug>
   creator status <slug>`;
 
 async function main(arguments_: readonly string[]): Promise<number> {
@@ -71,6 +73,9 @@ async function main(arguments_: readonly string[]): Promise<number> {
         return exportPackage(argumentsForCommand[0]!);
       case "publish":
         return publish(argumentsForCommand);
+      case "snapshot":
+        requireArgumentCount(command, argumentsForCommand, 1);
+        return snapshot(argumentsForCommand[0]!);
       case "status":
         requireArgumentCount(command, argumentsForCommand, 1);
         return status(argumentsForCommand[0]!);
@@ -224,6 +229,12 @@ async function publish(argumentsForCommand: readonly string[]): Promise<number> 
     default:
       throw new CliError("Usage: creator publish <plan|dry-run> <slug>");
   }
+}
+
+function snapshot(slug: string): number {
+  createProjectReuseSnapshot(slug);
+  write(`REUSE_SNAPSHOT_READY ${slug}`);
+  return 0;
 }
 
 function requireArgumentCount(command: string, argumentsForCommand: readonly string[], count: number): void {
