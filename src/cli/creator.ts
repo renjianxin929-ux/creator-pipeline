@@ -5,6 +5,7 @@ import { planProjectAssets } from "../assets/asset-planner.js";
 import { generateProjectAssets } from "../assets/generate-assets.js";
 import { resolveProjectBrand } from "../brand/project-brand.js";
 import { planProjectEdit } from "../edit/edit-planner.js";
+import { exportApprovedPackage } from "../export/export-approved-package.js";
 import { ingestMedia } from "../ingest/ingest-media.js";
 import { initializeProject, ProjectStoreError, readProjectState } from "../project/project-store.js";
 import { renderProjectPreview } from "../render/preview-renderer.js";
@@ -25,6 +26,7 @@ Usage:
   creator edit plan <slug>
   creator render preview <slug>
   creator approve <slug>
+  creator export <slug>
   creator status <slug>`;
 
 async function main(arguments_: readonly string[]): Promise<number> {
@@ -61,6 +63,9 @@ async function main(arguments_: readonly string[]): Promise<number> {
       case "approve":
         requireArgumentCount(command, argumentsForCommand, 1);
         return approve(argumentsForCommand[0]!);
+      case "export":
+        requireArgumentCount(command, argumentsForCommand, 1);
+        return exportPackage(argumentsForCommand[0]!);
       case "status":
         requireArgumentCount(command, argumentsForCommand, 1);
         return status(argumentsForCommand[0]!);
@@ -184,6 +189,12 @@ async function render(argumentsForCommand: readonly string[]): Promise<number> {
 function approve(slug: string): number {
   const approval = approveProjectPreview(slug);
   write(`HUMAN_APPROVED ${slug} ${approval.preview_sha256}`);
+  return 0;
+}
+
+function exportPackage(slug: string): number {
+  const result = exportApprovedPackage(slug);
+  write(`EXPORT_READY ${slug} ${result.master_path}`);
   return 0;
 }
 
