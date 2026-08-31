@@ -17,6 +17,7 @@ import {
   previewApprovalSchema,
   projectIdentitySchema,
   projectGenerationBudgetSchema,
+  projectReportSchema,
   projectSlugSchema,
   projectStateSchema,
   reuseSnapshotSchema,
@@ -33,6 +34,7 @@ import {
   type PreviewApproval,
   type ProjectIdentity,
   type ProjectGenerationBudget,
+  type ProjectReport,
   type ProjectState,
   type ProjectStateValue,
   type ReuseSnapshot,
@@ -247,6 +249,33 @@ export function appendProjectEvent(slugInput: string, event: EventRecord, cwd = 
   );
 }
 
+export function readProjectEvents(slugInput: string, cwd = process.cwd()): EventRecord[] {
+  const slug = requireSlug(slugInput);
+  const eventsPath = join(resolveProjectDirectory(slug, cwd), "events.ndjson");
+  if (!existsSync(eventsPath)) {
+    return [];
+  }
+
+  const lines = readFileSync(eventsPath, "utf8")
+    .split(/\r?\n/u)
+    .filter((line) => line.length > 0);
+
+  return lines.map((line) => {
+    let rawEvent: unknown;
+    try {
+      rawEvent = JSON.parse(line);
+    } catch {
+      throw new ProjectStoreError(`Unable to read valid event record for: ${slug}`);
+    }
+
+    const parsed = eventRecordSchema.safeParse(rawEvent);
+    if (!parsed.success || parsed.data.project !== slug) {
+      throw new ProjectStoreError(`Invalid event record for: ${slug}`);
+    }
+    return parsed.data;
+  });
+}
+
 export function readProjectTranscript(slugInput: string, cwd = process.cwd()): TranscriptDocument | undefined {
   const slug = requireSlug(slugInput);
   const transcriptPath = join(resolveProjectDirectory(slug, cwd), "derived", "transcript.json");
@@ -419,6 +448,16 @@ export function writeProjectReuseSnapshot(slugInput: string, snapshot: ReuseSnap
   }
 
   writeJson(join(resolveProjectDirectory(slug, cwd), "publish", "reuse-snapshot.json"), parsed);
+}
+
+export function writeProjectReport(slugInput: string, report: ProjectReport, cwd = process.cwd()): void {
+  const slug = requireSlug(slugInput);
+  const parsed = projectReportSchema.parse(report);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Project report project_slug must match the target project");
+  }
+
+  writeJson(join(resolveProjectDirectory(slug, cwd), "review", "report.json"), parsed);
 }
 
 export function readProjectPreviewApproval(slugInput: string, cwd = process.cwd()): PreviewApproval | undefined {

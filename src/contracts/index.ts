@@ -125,6 +125,13 @@ export {
   type ReuseSnapshot,
 } from "./reuse-snapshot.js";
 export {
+  projectReportSchema,
+  reportAbsentSchema,
+  reportAbsentValue,
+  type ProjectReport,
+  type ReportAbsent,
+} from "./report.js";
+export {
   diffEditPlans,
   editPlanClipSchema,
   editPlanFormatSchema,

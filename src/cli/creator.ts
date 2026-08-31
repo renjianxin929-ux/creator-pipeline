@@ -10,6 +10,7 @@ import { ingestMedia } from "../ingest/ingest-media.js";
 import { initializeProject, ProjectStoreError, readProjectState } from "../project/project-store.js";
 import { dryRunProjectPublish, planProjectPublish } from "../publish/publish-project.js";
 import { renderProjectPreview } from "../render/preview-renderer.js";
+import { createProjectReport } from "../report/project-report.js";
 import { approveProjectPreview } from "../review/approve-preview.js";
 import { createProjectReuseSnapshot } from "../reuse/reuse-snapshot.js";
 import { selectDefaultTranscribeAdapter } from "../transcribe/adapter-selection.js";
@@ -32,6 +33,7 @@ Usage:
   creator publish plan <slug>
   creator publish dry-run <slug>
   creator snapshot <slug>
+  creator report <slug>
   creator status <slug>`;
 
 async function main(arguments_: readonly string[]): Promise<number> {
@@ -76,6 +78,9 @@ async function main(arguments_: readonly string[]): Promise<number> {
       case "snapshot":
         requireArgumentCount(command, argumentsForCommand, 1);
         return snapshot(argumentsForCommand[0]!);
+      case "report":
+        requireArgumentCount(command, argumentsForCommand, 1);
+        return report(argumentsForCommand[0]!);
       case "status":
         requireArgumentCount(command, argumentsForCommand, 1);
         return status(argumentsForCommand[0]!);
@@ -234,6 +239,11 @@ async function publish(argumentsForCommand: readonly string[]): Promise<number> 
 function snapshot(slug: string): number {
   createProjectReuseSnapshot(slug);
   write(`REUSE_SNAPSHOT_READY ${slug}`);
+  return 0;
+}
+
+function report(slug: string): number {
+  write(JSON.stringify(createProjectReport(slug), null, 2));
   return 0;
 }
 
