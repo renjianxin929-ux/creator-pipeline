@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 
@@ -13,6 +13,7 @@ import {
   eventRecordSchema,
   mediaRecordListSchema,
   mediaRecordSchema,
+  previewApprovalSchema,
   projectIdentitySchema,
   projectGenerationBudgetSchema,
   projectSlugSchema,
@@ -26,6 +27,7 @@ import {
   type AssetPlan,
   type EditPlan,
   type MediaRecord,
+  type PreviewApproval,
   type ProjectIdentity,
   type ProjectGenerationBudget,
   type ProjectState,
@@ -347,6 +349,44 @@ export function writeProjectEditPlan(slugInput: string, plan: EditPlan, cwd = pr
   const slug = requireSlug(slugInput);
   const parsed = editPlanSchema.parse(plan);
   writeJson(join(resolveProjectDirectory(slug, cwd), "plans", "edit-plan.json"), parsed);
+}
+
+export function readProjectPreviewApproval(slugInput: string, cwd = process.cwd()): PreviewApproval | undefined {
+  const slug = requireSlug(slugInput);
+  const approvalPath = join(resolveProjectDirectory(slug, cwd), "review", "approval.json");
+
+  if (!existsSync(approvalPath)) {
+    return undefined;
+  }
+
+  let rawApproval: unknown;
+  try {
+    rawApproval = JSON.parse(readFileSync(approvalPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid preview approval for: ${slug}`);
+  }
+
+  const parsed = previewApprovalSchema.safeParse(rawApproval);
+  if (!parsed.success) {
+    throw new ProjectStoreError(`Invalid preview approval for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function writeProjectPreviewApproval(
+  slugInput: string,
+  approval: PreviewApproval,
+  cwd = process.cwd(),
+): void {
+  const slug = requireSlug(slugInput);
+  const parsed = previewApprovalSchema.parse(approval);
+  writeJson(join(resolveProjectDirectory(slug, cwd), "review", "approval.json"), parsed);
+}
+
+export function removeProjectPreviewApproval(slugInput: string, cwd = process.cwd()): void {
+  const slug = requireSlug(slugInput);
+  rmSync(join(resolveProjectDirectory(slug, cwd), "review", "approval.json"), { force: true });
 }
 
 export function readProjectAssetManifest(slugInput: string, cwd = process.cwd()): AssetManifest {

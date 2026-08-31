@@ -8,10 +8,11 @@ import { planProjectEdit } from "../edit/edit-planner.js";
 import { ingestMedia } from "../ingest/ingest-media.js";
 import { initializeProject, ProjectStoreError, readProjectState } from "../project/project-store.js";
 import { renderProjectPreview } from "../render/preview-renderer.js";
+import { approveProjectPreview } from "../review/approve-preview.js";
 import { selectDefaultTranscribeAdapter } from "../transcribe/adapter-selection.js";
 import { transcribeProject } from "../transcribe/transcribe-project.js";
 
-const helpText = `Creator Pipeline P5 CLI
+const helpText = `Creator Pipeline P6 CLI
 
 Usage:
   creator doctor
@@ -23,6 +24,7 @@ Usage:
   creator assets generate <slug>
   creator edit plan <slug>
   creator render preview <slug>
+  creator approve <slug>
   creator status <slug>`;
 
 async function main(arguments_: readonly string[]): Promise<number> {
@@ -56,6 +58,9 @@ async function main(arguments_: readonly string[]): Promise<number> {
         return edit(argumentsForCommand);
       case "render":
         return render(argumentsForCommand);
+      case "approve":
+        requireArgumentCount(command, argumentsForCommand, 1);
+        return approve(argumentsForCommand[0]!);
       case "status":
         requireArgumentCount(command, argumentsForCommand, 1);
         return status(argumentsForCommand[0]!);
@@ -173,6 +178,12 @@ async function render(argumentsForCommand: readonly string[]): Promise<number> {
 
   const result = await renderProjectPreview(slug);
   write(`PREVIEW_READY ${slug} ${result.preview_path}`);
+  return 0;
+}
+
+function approve(slug: string): number {
+  const approval = approveProjectPreview(slug);
+  write(`HUMAN_APPROVED ${slug} ${approval.preview_sha256}`);
   return 0;
 }
 
