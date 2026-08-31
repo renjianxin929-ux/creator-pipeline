@@ -87,6 +87,10 @@ export {
   type MediaRecord,
 } from "./media.js";
 export {
+  previewApprovalSchema,
+  type PreviewApproval,
+} from "./approval.js";
+export {
   diffEditPlans,
   editPlanClipSchema,
   editPlanFormatSchema,
