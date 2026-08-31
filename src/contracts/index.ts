@@ -91,6 +91,26 @@ export {
   type PreviewApproval,
 } from "./approval.js";
 export {
+  platformIdSchema,
+  platformIdValues,
+  projectRelativePathSchema,
+  publishMetadataSchema,
+  publishPackageSchema,
+  publishResultSchema,
+  publishResultStatusSchema,
+  publishResultStatusValues,
+  publishTargetSchema,
+  publishValidationSchema,
+  type PlatformId,
+  type ProjectRelativePath,
+  type PublishMetadata,
+  type PublishPackage,
+  type PublishResult,
+  type PublishResultStatus,
+  type PublishTarget,
+  type PublishValidation,
+} from "./publish.js";
+export {
   diffEditPlans,
   editPlanClipSchema,
   editPlanFormatSchema,
