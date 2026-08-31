@@ -13,6 +13,7 @@ import {
   eventRecordSchema,
   mediaRecordListSchema,
   mediaRecordSchema,
+  publishPlanSchema,
   previewApprovalSchema,
   projectIdentitySchema,
   projectGenerationBudgetSchema,
@@ -27,6 +28,7 @@ import {
   type AssetPlan,
   type EditPlan,
   type MediaRecord,
+  type PublishPlan,
   type PreviewApproval,
   type ProjectIdentity,
   type ProjectGenerationBudget,
@@ -349,6 +351,39 @@ export function writeProjectEditPlan(slugInput: string, plan: EditPlan, cwd = pr
   const slug = requireSlug(slugInput);
   const parsed = editPlanSchema.parse(plan);
   writeJson(join(resolveProjectDirectory(slug, cwd), "plans", "edit-plan.json"), parsed);
+}
+
+export function readProjectPublishPlan(slugInput: string, cwd = process.cwd()): PublishPlan | undefined {
+  const slug = requireSlug(slugInput);
+  const planPath = join(resolveProjectDirectory(slug, cwd), "publish", "plan.json");
+
+  if (!existsSync(planPath)) {
+    return undefined;
+  }
+
+  let rawPlan: unknown;
+  try {
+    rawPlan = JSON.parse(readFileSync(planPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid publish plan for: ${slug}`);
+  }
+
+  const parsed = publishPlanSchema.safeParse(rawPlan);
+  if (!parsed.success || parsed.data.project_slug !== slug) {
+    throw new ProjectStoreError(`Invalid publish plan for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function writeProjectPublishPlan(slugInput: string, plan: PublishPlan, cwd = process.cwd()): void {
+  const slug = requireSlug(slugInput);
+  const parsed = publishPlanSchema.parse(plan);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Publish plan project_slug must match the target project");
+  }
+
+  writeJson(join(resolveProjectDirectory(slug, cwd), "publish", "plan.json"), parsed);
 }
 
 export function readProjectPreviewApproval(slugInput: string, cwd = process.cwd()): PreviewApproval | undefined {

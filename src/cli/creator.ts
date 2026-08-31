@@ -8,12 +8,13 @@ import { planProjectEdit } from "../edit/edit-planner.js";
 import { exportApprovedPackage } from "../export/export-approved-package.js";
 import { ingestMedia } from "../ingest/ingest-media.js";
 import { initializeProject, ProjectStoreError, readProjectState } from "../project/project-store.js";
+import { dryRunProjectPublish, planProjectPublish } from "../publish/publish-project.js";
 import { renderProjectPreview } from "../render/preview-renderer.js";
 import { approveProjectPreview } from "../review/approve-preview.js";
 import { selectDefaultTranscribeAdapter } from "../transcribe/adapter-selection.js";
 import { transcribeProject } from "../transcribe/transcribe-project.js";
 
-const helpText = `Creator Pipeline P6 CLI
+const helpText = `Creator Pipeline P7 CLI
 
 Usage:
   creator doctor
@@ -27,6 +28,8 @@ Usage:
   creator render preview <slug>
   creator approve <slug>
   creator export <slug>
+  creator publish plan <slug>
+  creator publish dry-run <slug>
   creator status <slug>`;
 
 async function main(arguments_: readonly string[]): Promise<number> {
@@ -66,6 +69,8 @@ async function main(arguments_: readonly string[]): Promise<number> {
       case "export":
         requireArgumentCount(command, argumentsForCommand, 1);
         return exportPackage(argumentsForCommand[0]!);
+      case "publish":
+        return publish(argumentsForCommand);
       case "status":
         requireArgumentCount(command, argumentsForCommand, 1);
         return status(argumentsForCommand[0]!);
@@ -196,6 +201,29 @@ function exportPackage(slug: string): number {
   const result = exportApprovedPackage(slug);
   write(`EXPORT_READY ${slug} ${result.master_path}`);
   return 0;
+}
+
+async function publish(argumentsForCommand: readonly string[]): Promise<number> {
+  const [subcommand, slug, ...remaining] = argumentsForCommand;
+  if (slug === undefined || remaining.length !== 0) {
+    throw new CliError("Usage: creator publish <plan|dry-run> <slug>");
+  }
+
+  switch (subcommand) {
+    case "plan": {
+      const plan = planProjectPublish(slug);
+      write(`PUBLISH_PLAN_READY ${slug} ${plan.targets.length}`);
+      return 0;
+    }
+    case "dry-run": {
+      const result = await dryRunProjectPublish(slug);
+      const allAccepted = result.results.every((publishResult) => publishResult.status === "accepted");
+      write(`${allAccepted ? "PUBLISH_READY" : "PUBLISH_ATTENTION"} ${slug} ${result.results.length}`);
+      return allAccepted ? 0 : 1;
+    }
+    default:
+      throw new CliError("Usage: creator publish <plan|dry-run> <slug>");
+  }
 }
 
 function requireArgumentCount(command: string, argumentsForCommand: readonly string[], count: number): void {

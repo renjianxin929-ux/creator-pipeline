@@ -73,6 +73,29 @@ export const publishValidationSchema = z
   .strict();
 export type PublishValidation = z.infer<typeof publishValidationSchema>;
 
+export const publishPlanSchema = z
+  .object({
+    version: z.literal(1),
+    project_slug: projectSlugSchema,
+    package: publishPackageSchema,
+    targets: z.array(publishTargetSchema).min(1),
+  })
+  .strict()
+  .superRefine((plan, context) => {
+    const platforms = new Set<PlatformId>();
+    for (const [index, target] of plan.targets.entries()) {
+      if (platforms.has(target.platform)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `publish plan must not repeat platform: ${target.platform}`,
+          path: ["targets", index, "platform"],
+        });
+      }
+      platforms.add(target.platform);
+    }
+  });
+export type PublishPlan = z.infer<typeof publishPlanSchema>;
+
 /**
  * A publish attempt is persisted as a structured result, never inferred from
  * console output or a network response body.
