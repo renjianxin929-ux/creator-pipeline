@@ -1,47 +1,72 @@
 # AGENTS.md
 
-Codex is the only EXECUTOR.
+Codex is the only EXECUTOR unless the Founder explicitly assigns another executor for a bounded task.
 
 ## Law
 
-1. `docs/CREATOR_PIPELINE_V3_DEVELOPMENT_CONTRACT.md` is the constitution.
-2. `docs/FOUNDER_ADDENDUM.md` overrides only repo location, visibility, and batch cadence.
-3. `docs/tickets/BATCH_*.md` is the only executable scope.
-4. If a ticket and the contract fight, stop and ask. Do not silently pick the ticket.
+1. `docs/CREATOR_PIPELINE_V3_DEVELOPMENT_CONTRACT.md` remains the V3 constitution.
+2. `docs/FOUNDER_ADDENDUM.md` overrides only repo location, visibility, and the original V3 batch cadence.
+3. `docs/FOUNDER_DIRECTOR_STYLE_LAYER_DECISION_2026-09-07.md` is the Founder-frozen post-V3 decision for the Director + REN Style layer.
+4. `docs/tickets/BATCH_P9_STYLE_DIRECTOR_FOUNDATION.md` is the current executable scope.
+5. If the P9 ticket and the V3 constitution conflict, stop and ask. P9 may extend V3 after P0–P8 closure, but may not silently weaken V3 product principles, state-source rules, adapter boundaries, or human gates.
 
 ## Before code
 
-Read, in order: README, constitution, addendum, current batch ticket file.
+Read, in order:
 
-If the constitution file is missing or is a stub, stop. Do not invent a replacement contract.
+1. `README.md`
+2. `docs/CREATOR_PIPELINE_V3_DEVELOPMENT_CONTRACT.md`
+3. `docs/FOUNDER_ADDENDUM.md`
+4. `docs/FOUNDER_DIRECTOR_STYLE_LAYER_DECISION_2026-09-07.md`
+5. `docs/tickets/BATCH_P9_STYLE_DIRECTOR_FOUNDATION.md`
+6. relevant existing implementation and tests
 
-## Current cadence
+If any required governing file is missing or a stub, stop. Do not invent a replacement contract.
 
-You may finish all four P0 tickets in one session.
-You must still make four commits, one theme each.
-You must not start P1.
+## Current state
 
-## Hard bans (from constitution)
+- P0–P8 engineering: CLOSED
+- R3: remains CLOSED unless the Founder explicitly reopens it
+- Current next batch: `P9 — Director Layer + REN Style Foundation`
 
-- Do not rebuild topic / research / competitor systems
-- Do not treat Grok website quota as xAI API billing
-- Do not call live Grok / MiniMax / Omni / publish APIs in P0
-- Do not add OpenCut as a runtime dependency
-- Do not store cookies, tokens, or browser profiles
-- Do not make Markdown the source of project state
-- Do not introduce Kafka, Temporal, Kubernetes, or a second orchestrator
-- Do not import the old social-media platform as a runtime dependency
+P9 is a post-V3 enhancement. Do not rewrite the original V3 constitution to make it fit.
+
+## P9 execution cadence
+
+P9 contains exactly four tickets in `docs/tickets/BATCH_P9_STYLE_DIRECTOR_FOUNDATION.md`.
+
+- Keep one theme per commit.
+- Preserve current P0–P8 behavior and tests.
+- Do not implement beyond P9 inside the same session.
+- Do not call P9 complete until the real-video Founder gate in the P9 ticket is satisfied.
+
+## Hard bans
+
+- Do not rebuild topic / research / competitor systems.
+- Do not rebuild OpenMontage inside this repo.
+- Do not treat Grok website quota as xAI API billing.
+- Do not add OpenCut as a production runtime dependency.
+- Do not store cookies, tokens, or browser profiles.
+- Do not make Markdown the source of project runtime state.
+- Do not introduce Kafka, Temporal, Kubernetes, or a second orchestrator.
+- Do not import the old social-media platform as a runtime dependency.
+- Do not make Asta, GPT, Claude, Codex, HyperFrames, video-use, SmartSub, or another vendor/tool the source of style truth.
+- Do not allow renderers to invent Director decisions.
+- Do not silently rewrite a frozen script.
+- Do not auto-promote Founder review feedback into reusable Style OS rules without explicit Founder approval.
 
 ## After the batch
 
-Return the constitution §44 packet:
+Return a closure packet containing:
 
-1. Files read
-2. What was treated as legacy / out of scope
-3. New tree
-4. State schema
-5. CLI commands
-6. Test result
-7. `git diff --stat`
-8. Commit hashes (four)
-9. Risks / open questions
+1. governing files read;
+2. baseline HEAD and final HEAD;
+3. files changed / new tree;
+4. Director + Style contracts added;
+5. CLI/use-case changes;
+6. test results including P0–P8 regression status;
+7. `git diff --stat`;
+8. commit hashes by ticket;
+9. real-video gate result or exact blocker;
+10. risks / open questions;
+11. whether Founder Edit Distance / Golden Set reporting is operational.
