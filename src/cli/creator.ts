@@ -13,6 +13,7 @@ import { dryRunProjectPublish, planProjectPublish } from "../publish/publish-pro
 import { renderProjectPreview } from "../render/preview-renderer.js";
 import { createProjectReport } from "../report/project-report.js";
 import { approveProjectPreview } from "../review/approve-preview.js";
+import { importFounderReview, prepareFounderReview } from "../review/founder-review.js";
 import { createProjectReuseSnapshot } from "../reuse/reuse-snapshot.js";
 import { selectDefaultTranscribeAdapter } from "../transcribe/adapter-selection.js";
 import { transcribeProject } from "../transcribe/transcribe-project.js";
@@ -30,6 +31,8 @@ Usage:
   creator director prepare <slug>
   creator director import <slug> <director-plan.json>
   creator director apply <slug>
+  creator director review prepare <slug>
+  creator director review import <slug> <review-decisions.json>
   creator edit plan <slug>
   creator render preview <slug>
   creator approve <slug>
@@ -224,9 +227,38 @@ function director(argumentsForCommand: readonly string[]): number {
       write(`DIRECTOR_APPLIED ${slug} ${result.plan.timeline.length}`);
       return 0;
     }
+    case "review":
+      return directorReview([slug, planPath, ...remaining].filter((value): value is string => value !== undefined));
     default:
       throw new CliError(
-        "Usage: creator director <prepare|import|apply> <slug> [director-plan.json]",
+        "Usage: creator director <prepare|import|apply|review> <slug> [director-plan.json]",
+      );
+  }
+}
+
+function directorReview(argumentsForCommand: readonly string[]): number {
+  const [action, slug, capturePath, ...remaining] = argumentsForCommand;
+
+  switch (action) {
+    case "prepare": {
+      if (slug === undefined || capturePath !== undefined || remaining.length !== 0) {
+        throw new CliError("Usage: creator director review prepare <slug>");
+      }
+      prepareFounderReview(slug);
+      write(`DIRECTOR_REVIEW_CONTEXT_READY ${slug} review/director-review-context.json`);
+      return 0;
+    }
+    case "import": {
+      if (slug === undefined || capturePath === undefined || remaining.length !== 0) {
+        throw new CliError("Usage: creator director review import <slug> <review-decisions.json>");
+      }
+      const dataset = importFounderReview(slug, capturePath);
+      write(`DIRECTOR_REVIEW_IMPORTED ${slug} ${dataset.reviews.length}`);
+      return 0;
+    }
+    default:
+      throw new CliError(
+        "Usage: creator director review <prepare|import> <slug> [review-decisions.json]",
       );
   }
 }
