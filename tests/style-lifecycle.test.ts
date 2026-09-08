@@ -151,7 +151,9 @@ describe("P9.2A style manifest loader boundary", () => {
 
     expect(manifest?.style_version).toBe("1.0");
     expect(manifest?.brand_version).toBe("1.0");
-    expect(manifest?.domains).toEqual({});
+    // P9.2D registers the six real seed domain files; presence only.
+    expect(manifest?.domains["editing-grammar"]).toEqual({ path: "style/editing-grammar.json" });
+    expect(manifest?.domains["reference-library"]).toEqual({ path: "style/references.json" });
     expect(JSON.stringify(manifest)).not.toMatch(/UNSET|CANDIDATE|OBSERVED|FROZEN/);
   });
 

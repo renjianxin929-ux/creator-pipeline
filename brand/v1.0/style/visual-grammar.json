@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "style_version": "1.0",
+  "items": [
+    {
+      "id": "visual.proof.real-demo",
+      "status": "CANDIDATE",
+      "purpose": "Carry spoken evidence with the real product surface.",
+      "applicable_roles": ["PROOF"],
+      "layout_intent": "Real screen content stays primary; its meaning must survive any crop.",
+      "title_allowed": false,
+      "caption_allowed": true,
+      "motion_allowed": true,
+      "forbidden_behaviors": ["Covering evidence with decorative overlays."],
+      "implementation_status": "UNSET"
+    }
+  ]
+}

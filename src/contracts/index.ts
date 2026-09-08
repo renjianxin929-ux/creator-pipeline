@@ -276,3 +276,12 @@ export {
   type ReferencesFile,
   type SourceLocator,
 } from "./style-references.js";
+export {
+  emptyDomainFile,
+  parseStyleOsSnapshot,
+  selectDurableTruth,
+  selectItemsByStatus,
+  selectRenPreferences,
+  styleOsSnapshotSchema,
+  type StyleOsSnapshot,
+} from "./style-snapshot.js";

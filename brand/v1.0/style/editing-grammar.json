@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "style_version": "1.0",
+  "items": [
+    {
+      "id": "editing.proof.real-evidence-first",
+      "status": "CANDIDATE",
+      "applies_to": ["PROOF"],
+      "rule": "Prefer real demo, screenshot, or result evidence over decorative B-roll.",
+      "allowed_visuals": ["visual.proof.real-demo"],
+      "forbidden_visuals": ["visual.proof.decorative-broll"],
+      "why": "Evidence segments exist to establish credibility; covering them with decoration weakens the claim.",
+      "evidence_refs": []
+    }
+  ]
+}

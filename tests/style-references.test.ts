@@ -281,7 +281,9 @@ describe("P9.2C manifest registration", () => {
     ).toThrow();
   });
 
-  it("leaves the repository seed manifest untouched", () => {
-    expect(loadStyleManifest("1.0")?.domains).toEqual({});
+  it("registers the library file while leaving the inbox out of the manifest", () => {
+    expect(loadStyleManifest("1.0")?.domains["reference-library"]).toEqual({
+      path: "style/references.json",
+    });
   });
 });

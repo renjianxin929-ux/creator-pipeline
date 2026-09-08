@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "style_version": "1.0",
+  "items": [
+    {
+      "id": "quality.proof.no-decorative-cover",
+      "status": "CANDIDATE",
+      "severity": "HARD",
+      "applies_to_roles": ["PROOF"],
+      "rule": "Never cover spoken evidence with decorative B-roll.",
+      "reason": "Evidence must stay visible to keep the claim credible.",
+      "evidence_refs": []
+    }
+  ]
+}

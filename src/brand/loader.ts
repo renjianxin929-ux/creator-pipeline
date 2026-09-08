@@ -134,7 +134,7 @@ function parseBrandKit(input: unknown): BrandKit {
   return parsed.data;
 }
 
-function readBrandJson<TSchema extends z.ZodTypeAny>(path: string, schema: TSchema): z.infer<TSchema> {
+export function readBrandJson<TSchema extends z.ZodTypeAny>(path: string, schema: TSchema): z.infer<TSchema> {
   if (!existsSync(path)) {
     throw new BrandKitError(`Brand file does not exist: ${path}`);
   }

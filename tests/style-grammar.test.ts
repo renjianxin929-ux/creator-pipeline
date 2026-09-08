@@ -299,7 +299,7 @@ describe("P9.2B lifecycle invariants and cross-contract validation", () => {
   });
 
   it("keeps the manifest to presence and path registration only", () => {
-    // repository seed manifest declares no domains and no preferences
+    // an empty manifest declares no domains and no preferences
     const seed = parseStyleManifest({
       style_version: "1.0",
       brand_version: "1.0",

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "style_version": "1.0",
+  "items": [
+    {
+      "id": "motion.keyword-pop",
+      "status": "UNSET",
+      "purpose": "Marks a spoken keyword without covering the speaker.",
+      "implementation_status": "UNSET"
+    }
+  ]
+}
