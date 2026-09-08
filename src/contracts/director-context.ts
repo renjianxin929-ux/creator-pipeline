@@ -4,7 +4,8 @@ import { assetManifestRecordSchema } from "./assets.js";
 import { brandVersionSchema } from "./brand.js";
 import {
   frozenScriptReferenceSchema,
-  scriptAnchorSchema,
+  scriptVisualRiskSchema,
+  type ScriptVisualRisk,
 } from "./director.js";
 import { mediaRecordSchema } from "./media.js";
 import { projectSlugSchema } from "./project.js";
@@ -192,33 +193,11 @@ export const directorOutputContractSchema = z
 export type DirectorOutputContract = z.infer<typeof directorOutputContractSchema>;
 
 /* ------------------------------------------------------------------ */
-/* SCRIPT_VISUAL_RISK                                                  */
+/* SCRIPT_VISUAL_RISK (canonical home: ./director.js)                  */
 /* ------------------------------------------------------------------ */
 
-export const scriptVisualRiskSeverityValues = ["low", "medium", "high"] as const;
-export const scriptVisualRiskSeveritySchema = z.enum(scriptVisualRiskSeverityValues);
-export type ScriptVisualRiskSeverity = z.infer<typeof scriptVisualRiskSeveritySchema>;
-
-/**
- * A warning that script content is speakable but may lack visual carriage.
- * Advisory only: the schema carries no script-edit fields, so a risk can
- * never rewrite the Frozen Script. P9.3A defines the contract; detection
- * and plan-carriage belong to later slices.
- */
-export const scriptVisualRiskSchema = z
-  .object({
-    id: z
-      .string()
-      .regex(/^risk_[a-z0-9][a-z0-9-]*$/, "risk id must be a stable id such as risk_001")
-      .refine(rejectVendor, { message: "risk id must not name a vendor, agent, or renderer" }),
-    type: z.literal("SCRIPT_VISUAL_RISK"),
-    script_anchor: scriptAnchorSchema,
-    reason: z.string().trim().min(1),
-    severity: scriptVisualRiskSeveritySchema,
-    suggested_action: z.string().trim().min(1).optional(),
-  })
-  .strict();
-export type ScriptVisualRisk = z.infer<typeof scriptVisualRiskSchema>;
+export { scriptVisualRiskSchema } from "./director.js";
+export type { ScriptVisualRisk } from "./director.js";
 
 /* ------------------------------------------------------------------ */
 /* Director Context                                                    */

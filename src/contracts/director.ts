@@ -138,6 +138,35 @@ export const directorTimeRangeSchema = z
   });
 export type DirectorTimeRange = z.infer<typeof directorTimeRangeSchema>;
 
+export const scriptVisualRiskSeverityValues = ["low", "medium", "high"] as const;
+export const scriptVisualRiskSeveritySchema = z.enum(scriptVisualRiskSeverityValues);
+export type ScriptVisualRiskSeverity = z.infer<typeof scriptVisualRiskSeveritySchema>;
+
+/**
+ * A warning that script content is speakable but may lack visual carriage.
+ * Advisory only: the schema carries no script-edit fields, so a risk can
+ * never rewrite the Frozen Script. Directors flag risks; Founders decide
+ * what (if anything) changes in the content layer.
+ */
+const riskVendorPattern =
+  /(asta|gpt|claude|codex|hyperframes|remotion|ffmpeg|opencut|smartsub|video-?use|openmontage)/i;
+export const scriptVisualRiskSchema = z
+  .object({
+    id: z
+      .string()
+      .regex(/^risk_[a-z0-9][a-z0-9-]*$/, "risk id must be a stable id such as risk_001")
+      .refine((value) => !riskVendorPattern.test(value), {
+        message: "risk id must not name a vendor, agent, or renderer",
+      }),
+    type: z.literal("SCRIPT_VISUAL_RISK"),
+    script_anchor: scriptAnchorSchema,
+    reason: z.string().trim().min(1),
+    severity: scriptVisualRiskSeveritySchema,
+    suggested_action: z.string().trim().min(1).optional(),
+  })
+  .strict();
+export type ScriptVisualRisk = z.infer<typeof scriptVisualRiskSchema>;
+
 export const directorSegmentSchema = z
   .object({
     segment_id: z.string().trim().min(1),
@@ -215,6 +244,7 @@ export const directorPlanSchema = z
     style_reference: styleReferenceSchema,
     segments: z.array(directorSegmentSchema).min(1),
     created_at: z.string().datetime({ offset: true }).optional(),
+    script_visual_risks: z.array(scriptVisualRiskSchema).default([]),
   })
   .strict()
   .superRefine((plan, context) => {
