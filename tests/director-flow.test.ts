@@ -286,6 +286,46 @@ describe("P9.3B style compliance", () => {
     expect(report.notes).toEqual([]);
   });
 
+  it("rejects a legal primary pick that still offers a forbidden visual", () => {
+    const context = proofContext();
+    const plan = manualPlan(context, [
+      proofSegment({
+        allowed_visuals: ["visual.proof.real-demo", "visual.proof.decorative-broll"],
+      }),
+    ]);
+
+    const report = validateDirectorPlanCompliance(plan, context);
+    expect(report.violations.map((issue) => issue.kind)).toContain("allowed-set-forbidden");
+    expect(() => assertDirectorPlanCompliant(plan, context)).toThrow(/decorative-broll/);
+  });
+
+  it("rejects an offered visual outside the rule's allowed set", () => {
+    const context = proofContext();
+    const plan = manualPlan(context, [
+      proofSegment({
+        allowed_visuals: ["visual.proof.real-demo", "visual.proof.cutaway"],
+      }),
+    ]);
+
+    const report = validateDirectorPlanCompliance(plan, context);
+    expect(report.violations.map((issue) => issue.kind)).toContain("allowed-set-not-permitted");
+    expect(() => assertDirectorPlanCompliant(plan, context)).toThrow();
+  });
+
+  it("keeps weaker-tier allowed-set deviations as notes, not failures", () => {
+    const context = proofContext({ status: "OBSERVED" });
+    const plan = manualPlan(context, [
+      proofSegment({
+        allowed_visuals: ["visual.proof.real-demo", "visual.proof.decorative-broll"],
+      }),
+    ]);
+
+    const report = validateDirectorPlanCompliance(plan, context);
+    expect(report.violations).toEqual([]);
+    expect(report.notes.map((issue) => issue.kind)).toContain("allowed-set-forbidden");
+    expect(() => assertDirectorPlanCompliant(plan, context)).not.toThrow();
+  });
+
   it("rejects PROOF decorative B-roll under a FROZEN fixture", () => {
     const context = proofContext({}, {});
     const plan = manualPlan(context, [
@@ -372,6 +412,103 @@ describe("P9.3B edit plan integration", () => {
     expect(result.plan.timeline[1]?.caption).toBe(false);
     expect(result.caption_updates).toBe(2);
     expect(result.plan.format).toBe("9:16");
+  });
+
+  it("scopes B-roll removal to the guarded segment range", () => {
+    const context = compileWith({
+      styleSnapshot: {
+        ...emptySnapshot(),
+        editing_grammar: {
+          version: 1,
+          style_version: "1.0",
+          items: [frozenProofRule()],
+        },
+      },
+    });
+    const plan = manualPlan(context, [
+      {
+        segment_id: "seg_01",
+        script_anchor: { start_line: 1, end_line: 1 },
+        source_range_ms: { start_ms: 0, end_ms: 2000 },
+        semantic_role: "CLAIM",
+        primary_visual: "visual.claim.talking-head",
+        allowed_visuals: ["visual.claim.talking-head"],
+        caption_mode: "default",
+        reason: "Claim establishes the speaker.",
+        confidence: 0.7,
+      },
+      proofSegment({ segment_id: "seg_02", source_range_ms: { start_ms: 2000, end_ms: 4000 } }),
+    ]);
+    const base = {
+      version: 1,
+      format: "9:16",
+      timeline: [
+        {
+          id: "clip_claim",
+          source: "raw/camera/talk.mp4",
+          source_start_ms: 0,
+          source_end_ms: 2000,
+          layout: "layout.talking-head",
+          caption: false,
+        },
+        {
+          id: "broll_claim",
+          source_asset_id: "asset_001",
+          source_start_ms: 0,
+          source_end_ms: 2000,
+          layout: "layout.broll",
+          caption: false,
+        },
+        {
+          id: "clip_proof",
+          source: "raw/camera/talk.mp4",
+          source_start_ms: 2000,
+          source_end_ms: 4000,
+          layout: "layout.talking-head",
+          caption: false,
+        },
+        {
+          id: "broll_proof",
+          source_asset_id: "asset_002",
+          source_start_ms: 2000,
+          source_end_ms: 4000,
+          layout: "layout.broll",
+          caption: false,
+        },
+      ],
+    };
+
+    const result = augmentEditPlanWithDirection(base, plan, context);
+
+    expect(result.plan.timeline.map((clip) => clip.id)).toEqual([
+      "clip_claim",
+      "broll_claim",
+      "clip_proof",
+    ]);
+    expect(result.removed_broll_clip_ids).toEqual(["broll_proof"]);
+  });
+
+  it("rejects a non-compliant plan before it may touch the timeline", () => {
+    const context = compileWith({
+      styleSnapshot: {
+        ...emptySnapshot(),
+        editing_grammar: {
+          version: 1,
+          style_version: "1.0",
+          items: [frozenProofRule()],
+        },
+      },
+    });
+    const violating = manualPlan(context, [
+      proofSegment({
+        primary_visual: "visual.proof.decorative-broll",
+        allowed_visuals: ["visual.proof.decorative-broll"],
+      }),
+    ]);
+
+    expect(() => augmentEditPlanWithDirection(baseEditPlan(), violating, context)).toThrow(
+      /decorative-broll/,
+    );
   });
 
   it("leaves the rule-based planner working with no DirectorPlan", () => {

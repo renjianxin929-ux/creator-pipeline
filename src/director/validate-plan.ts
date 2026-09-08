@@ -70,6 +70,10 @@ export function assertDirectorPlanBinding(planInput: DirectorPlan, contextInput:
  * OBSERVED, CANDIDATE, and approved-advisory deviations are recorded as
  * notes. UNSET items never reach guidance, so they can never fail or note.
  * No taste scoring happens here.
+ *
+ * Both the chosen primary visual and the whole offered allowed_visuals set
+ * are checked: listing a forbidden visual as available fails even when the
+ * primary pick itself is legal.
  */
 export function validateDirectorPlanCompliance(
   planInput: DirectorPlan,
@@ -138,6 +142,7 @@ function target(check: TierCheck): PlanComplianceIssue[] {
 function checkEditingRules(
   segment: {
     primary_visual: string;
+    allowed_visuals: readonly string[];
     semantic_role: string;
     segment_id: string;
     motion_id?: string;
@@ -169,6 +174,29 @@ function checkEditingRules(
         kind: "forbidden-visual",
         detail: `${segment.primary_visual} is forbidden by ${rule.id}`,
       });
+    }
+    // The whole offered set is constrained, not just the current pick: a
+    // segment that lists a forbidden visual as available fails even when
+    // its primary visual is legal.
+    for (const [index, offered] of segment.allowed_visuals.entries()) {
+      if (!rule.allowed_visuals.includes(offered)) {
+        target(check).push({
+          tier: check.tier,
+          rule_id: rule.id,
+          segment_id: segment.segment_id,
+          kind: "allowed-set-not-permitted",
+          detail: `allowed_visuals[${index}] ${offered} is outside the allowed visuals of ${rule.id}`,
+        });
+      }
+      if (rule.forbidden_visuals.includes(offered)) {
+        target(check).push({
+          tier: check.tier,
+          rule_id: rule.id,
+          segment_id: segment.segment_id,
+          kind: "allowed-set-forbidden",
+          detail: `allowed_visuals[${index}] ${offered} is forbidden by ${rule.id}`,
+        });
+      }
     }
     if (
       segment.motion_id !== undefined &&
