@@ -1,24 +1,5 @@
 {
   "style_version": "1.0",
   "brand_version": "1.0",
-  "domains": {
-    "editing-grammar": {
-      "status": "UNSET"
-    },
-    "visual-grammar": {
-      "status": "UNSET"
-    },
-    "motion-library": {
-      "status": "UNSET"
-    },
-    "caption-rules": {
-      "status": "UNSET"
-    },
-    "reference-library": {
-      "status": "UNSET"
-    },
-    "quality-gates": {
-      "status": "UNSET"
-    }
-  }
+  "domains": {}
 }

@@ -95,7 +95,7 @@ export function loadBrandKit(versionInput: string, cwd = process.cwd()): BrandKi
 /**
  * Reads the optional versioned Style OS manifest. Absence is legal: a Brand
  * Kit without style/ still loads exactly as before P9.2. The loader never
- * invents statuses and never promotes any domain toward FROZEN.
+ * invents domain presence and never promotes any style item toward FROZEN.
  */
 export function loadStyleManifest(versionInput: string, cwd = process.cwd()): StyleManifest | undefined {
   const version = parseBrandVersion(versionInput);

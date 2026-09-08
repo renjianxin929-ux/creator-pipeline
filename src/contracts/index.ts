@@ -189,7 +189,6 @@ export {
 export {
   STYLE_MANIFEST_RELATIVE_PATH,
   parseStyleManifest,
-  resolveDomainStatus,
   styleDomainSchema,
   styleDomainSlotSchema,
   styleDomainValues,

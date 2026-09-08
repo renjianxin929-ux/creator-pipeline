@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { loadBrandKit, loadCurrentBrandKit, loadStyleManifest } from "../src/brand/loader.ts";
 import {
   parseStyleManifest,
-  resolveDomainStatus,
   styleDomainValues,
   styleLifecycleSchema,
   styleLifecycleValues,
@@ -27,19 +26,12 @@ function baseManifest() {
   return {
     style_version: "1.0",
     brand_version: "1.0",
-    domains: {
-      "editing-grammar": { status: "UNSET" },
-      "visual-grammar": { status: "UNSET" },
-      "motion-library": { status: "UNSET" },
-      "caption-rules": { status: "UNSET" },
-      "reference-library": { status: "UNSET" },
-      "quality-gates": { status: "UNSET" },
-    },
+    domains: {},
   };
 }
 
 describe("P9.2A style lifecycle contract", () => {
-  it("accepts exactly the four lifecycle statuses", () => {
+  it("accepts exactly the four lifecycle statuses for future style items", () => {
     expect(styleLifecycleValues).toEqual(["UNSET", "CANDIDATE", "OBSERVED", "FROZEN"]);
 
     for (const status of styleLifecycleValues) {
@@ -51,40 +43,76 @@ describe("P9.2A style lifecycle contract", () => {
     expect(() => styleLifecycleSchema.parse("APPROVED")).toThrow();
     expect(() => styleLifecycleSchema.parse("unset")).toThrow();
     expect(() => styleLifecycleSchema.parse("FROZEN_PLUS")).toThrow();
+  });
+
+  it("keeps domain slots free of lifecycle judgment", () => {
+    const manifest = parseStyleManifest({
+      ...baseManifest(),
+      domains: { "editing-grammar": { path: "style/editing-grammar.json" } },
+    });
+    expect(manifest.domains["editing-grammar"]).toEqual({ path: "style/editing-grammar.json" });
+
+    // a lifecycle status on a domain slot is not a legal manifest
     expect(() =>
       parseStyleManifest({
         ...baseManifest(),
-        domains: { "editing-grammar": { status: "AUTO_FROZEN" } },
+        domains: { "editing-grammar": { status: "FROZEN" } },
+      }),
+    ).toThrow();
+    expect(() =>
+      parseStyleManifest({
+        ...baseManifest(),
+        domains: { "editing-grammar": { status: "UNSET" } },
       }),
     ).toThrow();
   });
 
-  it("treats UNSET as a legal first-class state", () => {
-    const manifest = parseStyleManifest(baseManifest());
-
-    for (const domain of styleDomainValues) {
-      expect(resolveDomainStatus(manifest, domain)).toBe("UNSET");
-    }
+  it("constrains domain paths to vendor-neutral style-relative files", () => {
+    expect(() =>
+      parseStyleManifest({
+        ...baseManifest(),
+        domains: { "motion-library": { path: "../motion.json" } },
+      }),
+    ).toThrow();
+    expect(() =>
+      parseStyleManifest({
+        ...baseManifest(),
+        domains: { "motion-library": { path: "style/hyperframes_motion.json" } },
+      }),
+    ).toThrow();
+    expect(() =>
+      parseStyleManifest({
+        ...baseManifest(),
+        domains: { "motion-library": { path: "style/motion.claude.json" } },
+      }),
+    ).toThrow();
   });
 
-  it("validates the manifest version identity", () => {
-    expect(parseStyleManifest(baseManifest()).style_version).toBe("1.0");
-    expect(() => parseStyleManifest({ ...baseManifest(), style_version: "v1" })).toThrow();
-    expect(() => parseStyleManifest({ ...baseManifest(), style_version: "" })).toThrow();
-  });
+  it("treats empty and missing domains as legal", () => {
+    expect(parseStyleManifest(baseManifest()).domains).toEqual({});
 
-  it("treats missing style domains as UNSET, never as a Founder preference", () => {
     const { domains: _omitted, ...withoutDomains } = baseManifest();
-    const manifest = parseStyleManifest(withoutDomains);
+    expect(parseStyleManifest(withoutDomains).domains).toEqual({});
+  });
 
-    expect(manifest.domains).toEqual({});
+  it("lets the manifest express presence only, never a Founder preference", () => {
+    const manifest = parseStyleManifest({
+      ...baseManifest(),
+      domains: {
+        "editing-grammar": { path: "style/editing-grammar.json" },
+        "quality-gates": { path: "style/quality-gates.json" },
+      },
+    });
+
+    // presence declares where a domain file lives; it claims nothing about
+    // Founder approval, so no lifecycle value may appear anywhere
+    expect(JSON.stringify(manifest)).not.toMatch(/UNSET|CANDIDATE|OBSERVED|FROZEN/);
+    expect(Object.keys(manifest.domains)).toEqual(["editing-grammar", "quality-gates"]);
 
     for (const domain of styleDomainValues) {
-      const status = resolveDomainStatus(manifest, domain);
-      expect(status).toBe("UNSET");
-      expect(status).not.toBe("CANDIDATE");
-      expect(status).not.toBe("OBSERVED");
-      expect(status).not.toBe("FROZEN");
+      if (domain !== "editing-grammar" && domain !== "quality-gates") {
+        expect(manifest.domains[domain]).toBeUndefined();
+      }
     }
   });
 
@@ -92,16 +120,20 @@ describe("P9.2A style lifecycle contract", () => {
     for (const moduleExports of [styleContractsModule, brandLoaderModule]) {
       for (const name of Object.keys(moduleExports)) {
         expect(name.toLowerCase()).not.toMatch(/promot/);
+        expect(name.toLowerCase()).not.toMatch(/aggregate.*status|status.*aggregate/);
       }
     }
 
-    // parsing and loading never upgrade a status behind the caller's back
-    const candidate = parseStyleManifest({
+    // parsing never upgrades or annotates behind the caller's back
+    const manifest = parseStyleManifest({
       ...baseManifest(),
-      domains: { "editing-grammar": { status: "CANDIDATE" } },
+      domains: { "editing-grammar": { path: "style/editing-grammar.json" } },
     });
-    expect(resolveDomainStatus(candidate, "editing-grammar")).toBe("CANDIDATE");
-    expect(resolveDomainStatus(candidate, "visual-grammar")).toBe("UNSET");
+    expect(manifest).toEqual({
+      style_version: "1.0",
+      brand_version: "1.0",
+      domains: { "editing-grammar": { path: "style/editing-grammar.json" } },
+    });
   });
 });
 
@@ -114,14 +146,13 @@ describe("P9.2A style manifest loader boundary", () => {
     expect(loadStyleManifest("1.0", fixtureCwd)).toBeUndefined();
   });
 
-  it("loads the repository seed manifest as all-UNSET", () => {
+  it("loads the repository seed manifest as presence-only", () => {
     const manifest = loadStyleManifest("1.0");
 
     expect(manifest?.style_version).toBe("1.0");
     expect(manifest?.brand_version).toBe("1.0");
-    for (const domain of styleDomainValues) {
-      expect(manifest === undefined ? undefined : resolveDomainStatus(manifest, domain)).toBe("UNSET");
-    }
+    expect(manifest?.domains).toEqual({});
+    expect(JSON.stringify(manifest)).not.toMatch(/UNSET|CANDIDATE|OBSERVED|FROZEN/);
   });
 
   it("rejects mismatched versions and invalid JSON at the loader boundary", () => {
