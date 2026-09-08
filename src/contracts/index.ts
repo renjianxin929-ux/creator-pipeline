@@ -251,6 +251,18 @@ export {
   type StylePatchProposal,
 } from "./style-candidates.js";
 export {
+  EMPTY_GOLDEN_SET,
+  GOLDEN_SET_RELATIVE_PATH,
+  founderGoldenApprovalSchema,
+  goldenEntrySchema,
+  goldenSetSchema,
+  parseGoldenEntry,
+  parseGoldenSet,
+  type FounderGoldenApproval,
+  type GoldenEntry,
+  type GoldenSet,
+} from "./golden-set.js";
+export {
   STYLE_MANIFEST_RELATIVE_PATH,
   parseStyleManifest,
   styleDomainSchema,
