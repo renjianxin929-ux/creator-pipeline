@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,11 +13,9 @@ import { sha256Bytes } from "../src/project/file-hash.ts";
 import {
   initializeProject,
   isProjectDirectorPlanStale,
-  readProjectDirectorDecisions,
   readProjectDirectorPlan,
   readProjectFrozenScript,
   readProjectFrozenScriptIdentity,
-  writeProjectDirectorDecisions,
   writeProjectDirectorPlan,
   writeProjectFrozenScript,
 } from "../src/project/project-store.ts";
@@ -31,6 +29,7 @@ afterEach(() => {
 });
 
 const FROZEN_SHA = "a".repeat(64);
+const TEST_PROJECT_ID = "test-project-id";
 
 function baseSegment() {
   return {
@@ -49,10 +48,11 @@ function baseSegment() {
   };
 }
 
-function basePlan() {
+function basePlan(projectId = TEST_PROJECT_ID) {
   return {
     version: 1,
     project_slug: "demo",
+    project_id: projectId,
     frozen_script: {
       path: "content/frozen-script.md",
       sha256: FROZEN_SHA,
@@ -162,7 +162,10 @@ describe("P9.1 director plan contract", () => {
     ).toThrow();
   });
 
-  it("rejects missing required frozen-script and style references", () => {
+  it("rejects missing required project, frozen-script, and style references", () => {
+    const { project_id: _id, ...withoutProjectId } = basePlan();
+    expect(() => parseDirectorPlan(withoutProjectId)).toThrow();
+
     const { frozen_script: _frozen, ...withoutFrozen } = basePlan();
     expect(() => parseDirectorPlan(withoutFrozen)).toThrow();
 
@@ -202,7 +205,7 @@ describe("P9.1 director plan contract", () => {
 describe("P9.1 director project store", () => {
   it("roundtrips frozen script bytes and the director plan", () => {
     const cwd = createTemporaryDirectory();
-    initializeProject("demo", cwd);
+    const project = initializeProject("demo", cwd);
 
     expect(readProjectFrozenScript("demo", cwd)).toBeUndefined();
     expect(readProjectDirectorPlan("demo", cwd)).toBeUndefined();
@@ -212,7 +215,7 @@ describe("P9.1 director project store", () => {
     expect(readProjectFrozenScriptIdentity("demo", cwd)).toEqual(identity);
 
     const plan = parseDirectorPlan({
-      ...basePlan(),
+      ...basePlan(project.identity.id),
       frozen_script: {
         path: "content/frozen-script.md",
         sha256: identity.sha256,
@@ -223,40 +226,124 @@ describe("P9.1 director project store", () => {
     expect(readProjectDirectorPlan("demo", cwd)).toEqual(plan);
     expect(isProjectDirectorPlanStale("demo", cwd)).toBe(false);
 
-    // any byte change invalidates the previously valid plan
+    // any byte change invalidates the previously valid plan on read
     writeProjectFrozenScript("demo", "# frozen\n\nLine one changed.\n", cwd);
     expect(isProjectDirectorPlanStale("demo", cwd)).toBe(true);
   });
 
-  it("rejects cross-project identity mismatches", () => {
+  it("rejects a foreign project id even when the slug matches", () => {
+    const cwd = createTemporaryDirectory();
+    const project = initializeProject("demo", cwd);
+    const frozen = writeProjectFrozenScript("demo", "# frozen\n", cwd);
+
+    const foreignPlan = parseDirectorPlan({
+      ...basePlan("foreign-project-id"),
+      frozen_script: {
+        path: "content/frozen-script.md",
+        sha256: frozen.sha256,
+        byte_size: frozen.byte_size,
+      },
+    });
+    expect(foreignPlan.project_slug).toBe("demo");
+    expect(project.identity.id).not.toBe("foreign-project-id");
+
+    // write rejects the foreign identity
+    expect(() => writeProjectDirectorPlan("demo", foreignPlan, cwd)).toThrow(
+      "project_id must match",
+    );
+
+    // a foreign plan file planted under the same slug is rejected on read
+    writeFileSync(
+      join(cwd, "workspace", "projects", "demo", "plans", "director-plan.json"),
+      JSON.stringify(foreignPlan),
+      "utf8",
+    );
+    expect(() => readProjectDirectorPlan("demo", cwd)).toThrow("Invalid director plan");
+  });
+
+  it("rejects cross-project slug mismatches", () => {
     const cwd = createTemporaryDirectory();
     initializeProject("demo", cwd);
-    initializeProject("other", cwd);
+    const other = initializeProject("other", cwd);
+    writeProjectFrozenScript("other", "# frozen\n", cwd);
 
-    expect(() => writeProjectDirectorPlan("other", parseDirectorPlan(basePlan()), cwd)).toThrow(
-      "project_slug must match",
-    );
+    expect(() =>
+      writeProjectDirectorPlan("other", parseDirectorPlan(basePlan(other.identity.id)), cwd),
+    ).toThrow("project_slug must match");
 
     // a plan file planted under the wrong project slug is rejected on read
     writeFileSync(
       join(cwd, "workspace", "projects", "other", "plans", "director-plan.json"),
-      JSON.stringify(parseDirectorPlan({ ...basePlan(), project_slug: "demo" })),
+      JSON.stringify(parseDirectorPlan({ ...basePlan(other.identity.id), project_slug: "demo" })),
       "utf8",
     );
     expect(() => readProjectDirectorPlan("other", cwd)).toThrow("Invalid director plan");
+  });
 
+  it("rejects stale frozen-script references at write time", () => {
+    const cwd = createTemporaryDirectory();
+    const project = initializeProject("demo", cwd);
+    const frozen = writeProjectFrozenScript("demo", "# frozen\n\nLine one.\n", cwd);
+
+    const matching = () =>
+      parseDirectorPlan({
+        ...basePlan(project.identity.id),
+        frozen_script: {
+          path: "content/frozen-script.md",
+          sha256: frozen.sha256,
+          byte_size: frozen.byte_size,
+        },
+      });
+
+    // current script is SHA A, plan references SHA B
     expect(() =>
-      writeProjectDirectorDecisions(
-        "other",
-        { version: 1, project_slug: "demo", director_frozen_script_sha256: FROZEN_SHA, decisions: [] },
+      writeProjectDirectorPlan(
+        "demo",
+        {
+          ...matching(),
+          frozen_script: {
+            path: "content/frozen-script.md",
+            sha256: "b".repeat(64),
+            byte_size: frozen.byte_size,
+          },
+        },
         cwd,
       ),
-    ).toThrow("project_slug must match");
+    ).toThrow("frozen-script identity does not match");
+
+    // SHA correct but byte_size wrong
+    expect(() =>
+      writeProjectDirectorPlan(
+        "demo",
+        {
+          ...matching(),
+          frozen_script: {
+            path: "content/frozen-script.md",
+            sha256: frozen.sha256,
+            byte_size: frozen.byte_size + 1,
+          },
+        },
+        cwd,
+      ),
+    ).toThrow("frozen-script identity does not match");
+
+    // matching identity writes pass and rejected writes left nothing behind
+    writeProjectDirectorPlan("demo", matching(), cwd);
+    expect(readProjectDirectorPlan("demo", cwd)).toEqual(matching());
+  });
+
+  it("requires an existing frozen script at write time", () => {
+    const cwd = createTemporaryDirectory();
+    const project = initializeProject("demo", cwd);
+
+    expect(() =>
+      writeProjectDirectorPlan("demo", parseDirectorPlan(basePlan(project.identity.id)), cwd),
+    ).toThrow("requires an existing frozen script");
   });
 
   it("rejects invalid JSON and invalid schemas instead of accepting them silently", () => {
     const cwd = createTemporaryDirectory();
-    initializeProject("demo", cwd);
+    const project = initializeProject("demo", cwd);
 
     writeFileSync(
       join(cwd, "workspace", "projects", "demo", "plans", "director-plan.json"),
@@ -267,33 +354,13 @@ describe("P9.1 director project store", () => {
 
     writeFileSync(
       join(cwd, "workspace", "projects", "demo", "plans", "director-plan.json"),
-      JSON.stringify({ ...basePlan(), segments: [{ ...baseSegment(), semantic_role: "VIBE" }] }),
+      JSON.stringify({
+        ...basePlan(project.identity.id),
+        segments: [{ ...baseSegment(), semantic_role: "VIBE" }],
+      }),
       "utf8",
     );
     expect(() => readProjectDirectorPlan("demo", cwd)).toThrow("Invalid director plan");
-  });
-
-  it("keeps a minimal decisions envelope without building the P9.4 review loop", () => {
-    const cwd = createTemporaryDirectory();
-    initializeProject("demo", cwd);
-
-    expect(readProjectDirectorDecisions("demo", cwd)).toBeUndefined();
-    writeProjectDirectorDecisions(
-      "demo",
-      { version: 1, project_slug: "demo", director_frozen_script_sha256: FROZEN_SHA, decisions: [] },
-      cwd,
-    );
-    expect(readProjectDirectorDecisions("demo", cwd)).toEqual({
-      version: 1,
-      project_slug: "demo",
-      director_frozen_script_sha256: FROZEN_SHA,
-      decisions: [],
-    });
-
-    const raw = JSON.parse(
-      readFileSync(join(cwd, "workspace", "projects", "demo", "review", "director-decisions.json"), "utf8"),
-    );
-    expect(raw.project_slug).toBe("demo");
   });
 });
 

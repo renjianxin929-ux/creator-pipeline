@@ -8,9 +8,7 @@ import { sha256Bytes } from "./file-hash.js";
 import {
   assetManifestSchema,
   assetPlanSchema,
-  DIRECTOR_DECISIONS_RELATIVE_PATH,
   DIRECTOR_PLAN_RELATIVE_PATH,
-  directorDecisionsFileSchema,
   directorPlanSchema,
   FROZEN_SCRIPT_RELATIVE_PATH,
   editPlanSchema,
@@ -32,7 +30,6 @@ import {
   silenceMapSchema,
   transcriptDocumentSchema,
   assertTransition,
-  type DirectorDecisionsFile,
   type DirectorPlan,
   type EventRecord,
   type AssetManifest,
@@ -650,14 +647,44 @@ export function readProjectDirectorPlan(slugInput: string, cwd = process.cwd()):
     throw new ProjectStoreError(`Invalid director plan for: ${slug}`);
   }
 
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.data.project_id !== identity.id) {
+    throw new ProjectStoreError(`Invalid director plan for: ${slug}`);
+  }
+
   return parsed.data;
 }
 
+/**
+ * Persists a Director Plan only when it binds to the current project
+ * identity and the current frozen-script bytes. A plan referencing a
+ * foreign project id, a changed hash, or a wrong byte size is rejected and
+ * never written. Post-write staleness (frozen script edited afterwards) is
+ * still reported by isProjectDirectorPlanStale, never silently repaired.
+ */
 export function writeProjectDirectorPlan(slugInput: string, plan: DirectorPlan, cwd = process.cwd()): void {
   const slug = requireSlug(slugInput);
   const parsed = directorPlanSchema.parse(plan);
   if (parsed.project_slug !== slug) {
     throw new ProjectStoreError("Director plan project_slug must match the target project");
+  }
+
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.project_id !== identity.id) {
+    throw new ProjectStoreError("Director plan project_id must match the target project identity");
+  }
+
+  const currentFrozen = readProjectFrozenScriptIdentity(slug, cwd);
+  if (currentFrozen === undefined) {
+    throw new ProjectStoreError(`Director plan requires an existing frozen script for: ${slug}`);
+  }
+  if (
+    parsed.frozen_script.sha256 !== currentFrozen.sha256 ||
+    parsed.frozen_script.byte_size !== currentFrozen.byte_size
+  ) {
+    throw new ProjectStoreError(
+      `Director plan frozen-script identity does not match the current frozen script for: ${slug}`,
+    );
   }
 
   writeJson(join(resolveProjectDirectory(slug, cwd), DIRECTOR_PLAN_RELATIVE_PATH), parsed);
@@ -681,50 +708,6 @@ export function isProjectDirectorPlanStale(slugInput: string, cwd = process.cwd(
   }
 
   return isDirectorPlanStale(plan, identity.sha256);
-}
-
-/**
- * Minimal P9.1 persistence for `review/director-decisions.json`. Full review
- * semantics, metrics, and Style OS promotion gates are P9.4 scope.
- */
-export function readProjectDirectorDecisions(
-  slugInput: string,
-  cwd = process.cwd(),
-): DirectorDecisionsFile | undefined {
-  const slug = requireSlug(slugInput);
-  const decisionsPath = join(resolveProjectDirectory(slug, cwd), DIRECTOR_DECISIONS_RELATIVE_PATH);
-
-  if (!existsSync(decisionsPath)) {
-    return undefined;
-  }
-
-  let rawDecisions: unknown;
-  try {
-    rawDecisions = JSON.parse(readFileSync(decisionsPath, "utf8"));
-  } catch {
-    throw new ProjectStoreError(`Unable to read valid director decisions for: ${slug}`);
-  }
-
-  const parsed = directorDecisionsFileSchema.safeParse(rawDecisions);
-  if (!parsed.success || parsed.data.project_slug !== slug) {
-    throw new ProjectStoreError(`Invalid director decisions for: ${slug}`);
-  }
-
-  return parsed.data;
-}
-
-export function writeProjectDirectorDecisions(
-  slugInput: string,
-  decisions: DirectorDecisionsFile,
-  cwd = process.cwd(),
-): void {
-  const slug = requireSlug(slugInput);
-  const parsed = directorDecisionsFileSchema.parse(decisions);
-  if (parsed.project_slug !== slug) {
-    throw new ProjectStoreError("Director decisions project_slug must match the target project");
-  }
-
-  writeJson(join(resolveProjectDirectory(slug, cwd), DIRECTOR_DECISIONS_RELATIVE_PATH), parsed);
 }
 
 function requireSlug(input: string): string {

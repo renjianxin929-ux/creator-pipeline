@@ -21,8 +21,8 @@ import { projectSlugSchema } from "./project.js";
 export const FROZEN_SCRIPT_RELATIVE_PATH = "content/frozen-script.md";
 export const DIRECTOR_PLAN_RELATIVE_PATH = "plans/director-plan.json";
 /**
- * P9.1 keeps only a minimal persistence envelope for this path. The full
- * Founder Decision Dataset is P9.4 scope and must not be built here.
+ * Reserved path only. The Founder Decision Dataset schema is P9.4 scope;
+ * P9.1 must not freeze any review semantics here.
  */
 export const DIRECTOR_DECISIONS_RELATIVE_PATH = "review/director-decisions.json";
 
@@ -198,13 +198,19 @@ export type DirectorSegment = z.infer<typeof directorSegmentSchema>;
 
 /**
  * The Director Plan is a derived visual-execution contract attached to one
- * exact Frozen Script identity. It is not a second timeline and it carries
- * no renderer execution details.
+ * exact Frozen Script identity and one exact project identity. It is not a
+ * second timeline and it carries no renderer execution details.
+ *
+ * project_id binds the plan to project.json identity.id so a plan copied
+ * from another project (even under the same slug) is rejected. The shape of
+ * ProjectIdentity itself is owned by src/contracts/project.ts and is not
+ * redesigned here.
  */
 export const directorPlanSchema = z
   .object({
     version: z.literal(1),
     project_slug: projectSlugSchema,
+    project_id: z.string().min(1),
     frozen_script: frozenScriptReferenceSchema,
     style_reference: styleReferenceSchema,
     segments: z.array(directorSegmentSchema).min(1),
@@ -240,38 +246,4 @@ export function isDirectorPlanStale(planInput: DirectorPlan, currentFrozenSha256
   const plan = directorPlanSchema.parse(planInput);
   const current = sha256Schema.parse(currentFrozenSha256);
   return plan.frozen_script.sha256 !== current;
-}
-
-export const directorDecisionActionValues = ["ACCEPT", "REJECT", "CHANGE"] as const;
-export const directorDecisionActionSchema = z.enum(directorDecisionActionValues);
-export type DirectorDecisionAction = z.infer<typeof directorDecisionActionSchema>;
-
-/**
- * Minimal P9.1 persistence record for `review/director-decisions.json`.
- * Only the envelope and project/frozen-script linkage are frozen here so
- * P9.4 can build the full review loop, metrics, and promotion gates on top.
- */
-export const directorDecisionRecordSchema = z
-  .object({
-    segment_id: z.string().trim().min(1),
-    action: directorDecisionActionSchema,
-    reason: z.string().trim().min(1).optional(),
-    replacement_visual: visualChoiceSchema.optional(),
-  })
-  .strict();
-export type DirectorDecisionRecord = z.infer<typeof directorDecisionRecordSchema>;
-
-export const directorDecisionsFileSchema = z
-  .object({
-    version: z.literal(1),
-    project_slug: projectSlugSchema,
-    director_frozen_script_sha256: sha256Schema,
-    decisions: z.array(directorDecisionRecordSchema).default([]),
-  })
-  .strict();
-export type DirectorDecisionsFile = z.infer<typeof directorDecisionsFileSchema>;
-
-/** Parses unknown JSON into the minimal P9.1 decisions envelope. */
-export function parseDirectorDecisionsFile(input: unknown): DirectorDecisionsFile {
-  return directorDecisionsFileSchema.parse(input);
 }
