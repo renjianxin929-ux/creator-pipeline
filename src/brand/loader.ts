@@ -11,8 +11,10 @@ import {
   colorTokensSchema,
   safeAreaTokensSchema,
   spacingTokensSchema,
+  styleManifestSchema,
   typographyTokensSchema,
   type BrandKit,
+  type StyleManifest,
 } from "../contracts/index.js";
 
 const brandPointerSchema = z
@@ -88,6 +90,30 @@ export function loadBrandKit(versionInput: string, cwd = process.cwd()): BrandKi
     templates: manifest.templates,
     defaults: manifest.defaults,
   });
+}
+
+/**
+ * Reads the optional versioned Style OS manifest. Absence is legal: a Brand
+ * Kit without style/ still loads exactly as before P9.2. The loader never
+ * invents statuses and never promotes any domain toward FROZEN.
+ */
+export function loadStyleManifest(versionInput: string, cwd = process.cwd()): StyleManifest | undefined {
+  const version = parseBrandVersion(versionInput);
+  const brandRoot = resolveBrandRoot(cwd);
+  const manifestPath = join(brandRoot, `v${version}`, "style", "manifest.json");
+
+  if (!existsSync(manifestPath)) {
+    return undefined;
+  }
+
+  const manifest = readBrandJson(manifestPath, styleManifestSchema);
+  if (manifest.brand_version !== version) {
+    throw new BrandKitError(
+      `Style manifest brand version mismatch: requested ${version}, found ${manifest.brand_version}`,
+    );
+  }
+
+  return manifest;
 }
 
 function parseBrandVersion(versionInput: string): string {

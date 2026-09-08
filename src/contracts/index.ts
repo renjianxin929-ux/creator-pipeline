@@ -186,3 +186,18 @@ export {
   type StyleReference,
   type VisualChoice,
 } from "./director.js";
+export {
+  STYLE_MANIFEST_RELATIVE_PATH,
+  parseStyleManifest,
+  resolveDomainStatus,
+  styleDomainSchema,
+  styleDomainSlotSchema,
+  styleDomainValues,
+  styleLifecycleSchema,
+  styleLifecycleValues,
+  styleManifestSchema,
+  type StyleDomain,
+  type StyleDomainSlot,
+  type StyleLifecycleStatus,
+  type StyleManifest,
+} from "./style-lifecycle.js";
