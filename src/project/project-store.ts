@@ -14,6 +14,10 @@ import {
   directorContextSchema,
   directorPlanSchema,
   founderDecisionDatasetSchema,
+  STYLE_CANDIDATE_APPROVALS_RELATIVE_PATH,
+  STYLE_CANDIDATES_RELATIVE_PATH,
+  styleCandidateApprovalDatasetSchema,
+  styleCandidateDiscoverySchema,
   FROZEN_SCRIPT_RELATIVE_PATH,
   editPlanSchema,
   createDefaultProjectGenerationBudget,
@@ -37,6 +41,8 @@ import {
   type DirectorContext,
   type DirectorPlan,
   type FounderDecisionDataset,
+  type StyleCandidateApprovalDataset,
+  type StyleCandidateDiscovery,
   type EventRecord,
   type AssetManifest,
   type AssetPlan,
@@ -804,6 +810,96 @@ export function writeProjectDirectorDecisions(
   }
 
   writeJson(join(resolveProjectDirectory(slug, cwd), DIRECTOR_DECISIONS_RELATIVE_PATH), parsed);
+}
+
+export function readProjectStyleCandidates(
+  slugInput: string,
+  cwd = process.cwd(),
+): StyleCandidateDiscovery | undefined {
+  const slug = requireSlug(slugInput);
+  const path = join(resolveProjectDirectory(slug, cwd), STYLE_CANDIDATES_RELATIVE_PATH);
+  if (!existsSync(path)) {
+    return undefined;
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid style candidates for: ${slug}`);
+  }
+
+  const parsed = styleCandidateDiscoverySchema.safeParse(raw);
+  if (!parsed.success || parsed.data.project_slug !== slug) {
+    throw new ProjectStoreError(`Invalid style candidates for: ${slug}`);
+  }
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.data.project_id !== identity.id) {
+    throw new ProjectStoreError(`Invalid style candidates for: ${slug}`);
+  }
+  return parsed.data;
+}
+
+export function writeProjectStyleCandidates(
+  slugInput: string,
+  discovery: StyleCandidateDiscovery,
+  cwd = process.cwd(),
+): void {
+  const slug = requireSlug(slugInput);
+  const parsed = styleCandidateDiscoverySchema.parse(discovery);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Style candidates project_slug must match the target project");
+  }
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.project_id !== identity.id) {
+    throw new ProjectStoreError("Style candidates project_id must match the target project identity");
+  }
+  writeJson(join(resolveProjectDirectory(slug, cwd), STYLE_CANDIDATES_RELATIVE_PATH), parsed);
+}
+
+export function readProjectStyleCandidateApprovals(
+  slugInput: string,
+  cwd = process.cwd(),
+): StyleCandidateApprovalDataset | undefined {
+  const slug = requireSlug(slugInput);
+  const path = join(resolveProjectDirectory(slug, cwd), STYLE_CANDIDATE_APPROVALS_RELATIVE_PATH);
+  if (!existsSync(path)) {
+    return undefined;
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid style candidate approvals for: ${slug}`);
+  }
+
+  const parsed = styleCandidateApprovalDatasetSchema.safeParse(raw);
+  if (!parsed.success || parsed.data.project_slug !== slug) {
+    throw new ProjectStoreError(`Invalid style candidate approvals for: ${slug}`);
+  }
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.data.project_id !== identity.id) {
+    throw new ProjectStoreError(`Invalid style candidate approvals for: ${slug}`);
+  }
+  return parsed.data;
+}
+
+export function writeProjectStyleCandidateApprovals(
+  slugInput: string,
+  dataset: StyleCandidateApprovalDataset,
+  cwd = process.cwd(),
+): void {
+  const slug = requireSlug(slugInput);
+  const parsed = styleCandidateApprovalDatasetSchema.parse(dataset);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Style candidate approvals project_slug must match the target project");
+  }
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.project_id !== identity.id) {
+    throw new ProjectStoreError("Style candidate approvals project_id must match the target project identity");
+  }
+  writeJson(join(resolveProjectDirectory(slug, cwd), STYLE_CANDIDATE_APPROVALS_RELATIVE_PATH), parsed);
 }
 
 /**
