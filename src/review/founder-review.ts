@@ -8,6 +8,7 @@ import {
   DIRECTOR_PLAN_RELATIVE_PATH,
   DIRECTOR_REVIEW_CONTEXT_RELATIVE_PATH,
   DIRECTOR_REVIEW_INPUT_RELATIVE_PATH,
+  PREVIEW_RELATIVE_PATH,
   directorSegmentSchema,
   founderDecisionDatasetSchema,
   isDirectorPlanStale,
@@ -29,6 +30,7 @@ import {
   readProjectEditPlan,
   readProjectFrozenScriptIdentity,
   readProjectIdentity,
+  readProjectPreviewProvenance,
   resolveProjectDirectory,
   writeProjectDirectorDecisions,
 } from "../project/project-store.js";
@@ -37,8 +39,8 @@ export class FounderReviewError extends Error {
   override name = "FounderReviewError";
 }
 
-const PREVIEW_RELATIVE_PATH = "render/preview.mp4";
 const EDIT_PLAN_RELATIVE_PATH = "plans/edit-plan.json";
+const STALE_PREVIEW_MESSAGE = "preview is stale; re-render preview";
 
 interface CurrentReviewArtifacts {
   context: FounderReviewContext;
@@ -166,6 +168,17 @@ function readCurrentReviewArtifacts(slug: string, cwd: string): CurrentReviewArt
     throw new FounderReviewError(`Preview does not exist for ${slug}; render/preview.mp4 is required`);
   }
 
+  const provenance = readProjectPreviewProvenance(slug, cwd);
+  const currentPreviewSha256 = sha256File(previewPath);
+  const currentEditPlanSha256 = sha256File(join(projectDirectory, EDIT_PLAN_RELATIVE_PATH));
+  if (
+    provenance === undefined ||
+    provenance.preview_sha256 !== currentPreviewSha256 ||
+    provenance.edit_plan_sha256 !== currentEditPlanSha256
+  ) {
+    throw new FounderReviewError(STALE_PREVIEW_MESSAGE);
+  }
+
   const styleVersion = loadStyleOS(resolveProjectBrand(slug, cwd).brand.brand_version, cwd).style_version;
   if (isDirectorContextStale(directorContext, identity, frozen.sha256, styleVersion)) {
     throw new FounderReviewError(`DirectorContext for ${slug} is stale; re-run director prepare`);
@@ -192,9 +205,9 @@ function readCurrentReviewArtifacts(slug: string, cwd: string): CurrentReviewArt
       style_version: plan.style_reference.style_version,
     },
     preview_reference: {
-      preview_path: PREVIEW_RELATIVE_PATH,
-      preview_sha256: sha256File(previewPath),
-      edit_plan_sha256: sha256File(join(projectDirectory, EDIT_PLAN_RELATIVE_PATH)),
+      preview_path: provenance.preview_path,
+      preview_sha256: provenance.preview_sha256,
+      edit_plan_sha256: provenance.edit_plan_sha256,
     },
     available_segment_ids: plan.segments.map((segment) => segment.segment_id),
     expected_input_path: DIRECTOR_REVIEW_INPUT_RELATIVE_PATH,

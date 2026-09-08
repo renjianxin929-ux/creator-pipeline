@@ -6,9 +6,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  PREVIEW_RELATIVE_PATH,
   type EditPlan,
   type TranscriptSegment,
 } from "../contracts/index.js";
+import { sha256File } from "../project/file-hash.js";
 import {
   executeFfmpegEditPlan,
   FfmpegEditPlanError,
@@ -20,11 +22,13 @@ import {
   appendProjectEvent,
   readProjectAssetManifest,
   readProjectEditPlan,
+  readProjectIdentity,
   readProjectMediaRecords,
   readProjectState,
   readProjectTranscript,
   resolveProjectDirectory,
   transitionProjectState,
+  writeProjectPreviewProvenance,
 } from "../project/project-store.js";
 import {
   CREATOR_PREVIEW_COMPOSITION_ID,
@@ -82,8 +86,10 @@ export async function renderProjectPreview(
   }
 
   const projectDirectory = resolveProjectDirectory(slug, cwd);
+  const editPlanPath = join(projectDirectory, "plans", "edit-plan.json");
+  const editPlanSha256 = sha256File(editPlanPath);
   const renderDirectory = join(projectDirectory, "render");
-  const previewPath = join(renderDirectory, "preview.mp4");
+  const previewPath = join(projectDirectory, PREVIEW_RELATIVE_PATH);
   const temporaryDirectory = join(renderDirectory, `.preview-${randomUUID()}`);
   const temporaryPublicDirectory = join(temporaryDirectory, "public");
   const temporaryBundleDirectory = join(temporaryDirectory, "bundle");
@@ -145,6 +151,19 @@ export async function renderProjectPreview(
     }
 
     replaceFileAtomically(temporaryPreviewPath, previewPath);
+    const identity = readProjectIdentity(slug, cwd);
+    writeProjectPreviewProvenance(
+      slug,
+      {
+        version: 1,
+        project_slug: identity.slug,
+        project_id: identity.id,
+        preview_path: PREVIEW_RELATIVE_PATH,
+        preview_sha256: sha256File(previewPath),
+        edit_plan_sha256: editPlanSha256,
+      },
+      cwd,
+    );
     if (currentState.status !== "PREVIEW_READY") {
       transitionProjectState(slug, "PREVIEW_READY", cwd);
     }

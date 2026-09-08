@@ -27,7 +27,9 @@ import {
   mediaRecordListSchema,
   mediaRecordSchema,
   publishPlanSchema,
+  PREVIEW_PROVENANCE_RELATIVE_PATH,
   previewApprovalSchema,
+  previewProvenanceSchema,
   projectIdentitySchema,
   projectGenerationBudgetSchema,
   projectReportSchema,
@@ -50,6 +52,7 @@ import {
   type MediaRecord,
   type PublishPlan,
   type PreviewApproval,
+  type PreviewProvenance,
   type ProjectIdentity,
   type ProjectGenerationBudget,
   type ProjectReport,
@@ -514,6 +517,56 @@ export function writeProjectPreviewApproval(
 export function removeProjectPreviewApproval(slugInput: string, cwd = process.cwd()): void {
   const slug = requireSlug(slugInput);
   rmSync(join(resolveProjectDirectory(slug, cwd), "review", "approval.json"), { force: true });
+}
+
+export function readProjectPreviewProvenance(
+  slugInput: string,
+  cwd = process.cwd(),
+): PreviewProvenance | undefined {
+  const slug = requireSlug(slugInput);
+  const provenancePath = join(resolveProjectDirectory(slug, cwd), PREVIEW_PROVENANCE_RELATIVE_PATH);
+
+  if (!existsSync(provenancePath)) {
+    return undefined;
+  }
+
+  let rawProvenance: unknown;
+  try {
+    rawProvenance = JSON.parse(readFileSync(provenancePath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid preview provenance for: ${slug}`);
+  }
+
+  const parsed = previewProvenanceSchema.safeParse(rawProvenance);
+  if (!parsed.success || parsed.data.project_slug !== slug) {
+    throw new ProjectStoreError(`Invalid preview provenance for: ${slug}`);
+  }
+
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.data.project_id !== identity.id) {
+    throw new ProjectStoreError(`Invalid preview provenance for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function writeProjectPreviewProvenance(
+  slugInput: string,
+  provenance: PreviewProvenance,
+  cwd = process.cwd(),
+): void {
+  const slug = requireSlug(slugInput);
+  const parsed = previewProvenanceSchema.parse(provenance);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Preview provenance project_slug must match the target project");
+  }
+
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.project_id !== identity.id) {
+    throw new ProjectStoreError("Preview provenance project_id must match the target project identity");
+  }
+
+  writeJson(join(resolveProjectDirectory(slug, cwd), PREVIEW_PROVENANCE_RELATIVE_PATH), parsed);
 }
 
 export function readProjectAssetManifest(slugInput: string, cwd = process.cwd()): AssetManifest {

@@ -181,6 +181,7 @@ describe("P5 edit-plan and preview gate", () => {
 
     expect(existsSync(result.preview_path)).toBe(true);
     expect(statSync(result.preview_path).size).toBeGreaterThan(0);
+    expect(existsSync(join(project.directory, "render", "preview-provenance.json"))).toBe(true);
     expect(readProjectState("preview", cwd)).toEqual({ status: "PREVIEW_READY" });
   }, 120_000);
 });

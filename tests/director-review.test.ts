@@ -6,12 +6,14 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prepareDirectorJob } from "../src/director/handoff.ts";
+import { sha256File } from "../src/project/file-hash.ts";
 import {
   initializeProject,
   readProjectDirectorDecisions,
   writeProjectDirectorPlan,
   writeProjectEditPlan,
   writeProjectFrozenScript,
+  writeProjectPreviewProvenance,
 } from "../src/project/project-store.ts";
 import {
   importFounderReview,
@@ -47,7 +49,24 @@ function setupReviewableProject(segmentCount: 1 | 2 = 2) {
   writeProjectDirectorPlan("demo", plan, cwd);
   writeProjectEditPlan("demo", baseEditPlan(), cwd);
   writeFileSync(join(cwd, "workspace", "projects", "demo", "render", "preview.mp4"), "preview-bytes", "utf8");
+  bindPreviewProvenance(cwd, project.identity.id);
   return { cwd, identity: project.identity, plan, context };
+}
+
+function bindPreviewProvenance(cwd: string, projectId: string, workspace = "workspace") {
+  const projectDirectory = join(cwd, workspace, "projects", "demo");
+  writeProjectPreviewProvenance(
+    "demo",
+    {
+      version: 1,
+      project_slug: "demo",
+      project_id: projectId,
+      preview_path: "render/preview.mp4",
+      preview_sha256: sha256File(join(projectDirectory, "render", "preview.mp4")),
+      edit_plan_sha256: sha256File(join(projectDirectory, "plans", "edit-plan.json")),
+    },
+    cwd,
+  );
 }
 
 function segmentOne() {
@@ -307,6 +326,71 @@ describe("P9.4B founder review capture", () => {
   });
 });
 
+describe("P9.4 founder review preview provenance", () => {
+  it("prepares a Founder review when preview provenance matches EditPlan A", () => {
+    const { cwd } = setupReviewableProject();
+    const context = prepareFounderReview("demo", cwd);
+    expect(context.preview_reference.preview_path).toBe("render/preview.mp4");
+    expect(context.preview_reference.edit_plan_sha256).toHaveLength(64);
+  });
+
+  it("rejects prepare after EditPlan changes without a re-render", () => {
+    const { cwd } = setupReviewableProject();
+    writeProjectEditPlan(
+      "demo",
+      {
+        ...baseEditPlan(),
+        timeline: [
+          {
+            id: "clip_002",
+            source: "raw/camera/talk.mp4",
+            source_start_ms: 0,
+            source_end_ms: 4000,
+            layout: "layout.talking-head",
+            caption: false,
+          },
+        ],
+      },
+      cwd,
+    );
+    expect(() => prepareFounderReview("demo", cwd)).toThrow(/preview is stale; re-render preview/);
+  });
+
+  it("rejects prepare after preview bytes change without updating provenance", () => {
+    const { cwd } = setupReviewableProject();
+    writeFileSync(join(cwd, "workspace", "projects", "demo", "render", "preview.mp4"), "preview-bytes-replaced", "utf8");
+    expect(() => prepareFounderReview("demo", cwd)).toThrow(/preview is stale; re-render preview/);
+  });
+
+  it("prepares after current provenance is rewritten for the new preview and EditPlan", () => {
+    const { cwd, identity } = setupReviewableProject();
+    writeProjectEditPlan(
+      "demo",
+      {
+        ...baseEditPlan(),
+        timeline: [
+          {
+            id: "clip_002",
+            source: "raw/camera/talk.mp4",
+            source_start_ms: 0,
+            source_end_ms: 4000,
+            layout: "layout.talking-head",
+            caption: false,
+          },
+        ],
+      },
+      cwd,
+    );
+    writeFileSync(join(cwd, "workspace", "projects", "demo", "render", "preview.mp4"), "preview-bytes-b", "utf8");
+    expect(() => prepareFounderReview("demo", cwd)).toThrow(/preview is stale; re-render preview/);
+    bindPreviewProvenance(cwd, identity.id);
+    const context = prepareFounderReview("demo", cwd);
+    expect(context.preview_reference.preview_sha256).toBe(
+      sha256File(join(cwd, "workspace", "projects", "demo", "render", "preview.mp4")),
+    );
+  });
+});
+
 describe("P9.4B founder review CLI", () => {
   it("prepares and imports a review through the CLI", () => {
     const cwd = mkdtempSync(join(tmpdir(), "creator-pipeline-p94b-cli-"));
@@ -346,6 +430,7 @@ describe("P9.4B founder review CLI", () => {
     );
     writeFileSync(join(projectDirectory, "plans", "edit-plan.json"), `${JSON.stringify(baseEditPlan(), null, 2)}\n`, "utf8");
     writeFileSync(join(projectDirectory, "render", "preview.mp4"), "preview-bytes", "utf8");
+    bindPreviewProvenance(cwd, storedContext.project_id, "temporary-workspace");
 
     const prepared = runCreator(cwd, ["director", "review", "prepare", "demo"]);
     expect(prepared.status).toBe(0);

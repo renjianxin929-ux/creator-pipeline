@@ -91,6 +91,13 @@ export {
   type PreviewApproval,
 } from "./approval.js";
 export {
+  parsePreviewProvenance,
+  PREVIEW_PROVENANCE_RELATIVE_PATH,
+  PREVIEW_RELATIVE_PATH,
+  previewProvenanceSchema,
+  type PreviewProvenance,
+} from "./preview-provenance.js";
+export {
   platformIdSchema,
   platformIdValues,
   projectRelativePathSchema,
