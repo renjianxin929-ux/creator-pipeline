@@ -192,6 +192,28 @@ export {
   type VisualChoice,
 } from "./director.js";
 export {
+  applyFounderReplacement,
+  directorPlanIdentitySchema,
+  founderDecisionActionSchema,
+  founderDecisionActionValues,
+  founderDecisionDatasetSchema,
+  founderDecisionSchema,
+  founderReplacementPatchSchema,
+  founderReuseScopeSchema,
+  founderReuseScopeValues,
+  founderReviewSessionSchema,
+  parseFounderDecisionDataset,
+  previewReferenceSchema,
+  type DirectorPlanIdentity,
+  type FounderDecision,
+  type FounderDecisionAction,
+  type FounderDecisionDataset,
+  type FounderReplacementPatch,
+  type FounderReuseScope,
+  type FounderReviewSession,
+  type PreviewReference,
+} from "./director-decisions.js";
+export {
   STYLE_MANIFEST_RELATIVE_PATH,
   parseStyleManifest,
   styleDomainSchema,

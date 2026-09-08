@@ -9,9 +9,11 @@ import {
   assetManifestSchema,
   assetPlanSchema,
   DIRECTOR_CONTEXT_RELATIVE_PATH,
+  DIRECTOR_DECISIONS_RELATIVE_PATH,
   DIRECTOR_PLAN_RELATIVE_PATH,
   directorContextSchema,
   directorPlanSchema,
+  founderDecisionDatasetSchema,
   FROZEN_SCRIPT_RELATIVE_PATH,
   editPlanSchema,
   createDefaultProjectGenerationBudget,
@@ -34,6 +36,7 @@ import {
   assertTransition,
   type DirectorContext,
   type DirectorPlan,
+  type FounderDecisionDataset,
   type EventRecord,
   type AssetManifest,
   type AssetPlan,
@@ -741,6 +744,66 @@ export function writeProjectDirectorPlan(slugInput: string, plan: DirectorPlan, 
   }
 
   writeJson(join(resolveProjectDirectory(slug, cwd), DIRECTOR_PLAN_RELATIVE_PATH), parsed);
+}
+
+/**
+ * Historical Founder Decision Dataset. Read validates schema plus project
+ * slug/id only. Missing current Preview / DirectorPlan artifacts never
+ * invalidate a previously recorded review.
+ */
+export function readProjectDirectorDecisions(
+  slugInput: string,
+  cwd = process.cwd(),
+): FounderDecisionDataset | undefined {
+  const slug = requireSlug(slugInput);
+  const datasetPath = join(resolveProjectDirectory(slug, cwd), DIRECTOR_DECISIONS_RELATIVE_PATH);
+
+  if (!existsSync(datasetPath)) {
+    return undefined;
+  }
+
+  let rawDataset: unknown;
+  try {
+    rawDataset = JSON.parse(readFileSync(datasetPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid director decisions for: ${slug}`);
+  }
+
+  const parsed = founderDecisionDatasetSchema.safeParse(rawDataset);
+  if (!parsed.success || parsed.data.project_slug !== slug) {
+    throw new ProjectStoreError(`Invalid director decisions for: ${slug}`);
+  }
+
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.data.project_id !== identity.id) {
+    throw new ProjectStoreError(`Invalid director decisions for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+/**
+ * Persists a Founder Decision Dataset bound to this project's identity.
+ * Does not require a current DirectorPlan, Preview, or Frozen Script to
+ * still exist — those identities already live inside the dataset.
+ */
+export function writeProjectDirectorDecisions(
+  slugInput: string,
+  dataset: FounderDecisionDataset,
+  cwd = process.cwd(),
+): void {
+  const slug = requireSlug(slugInput);
+  const parsed = founderDecisionDatasetSchema.parse(dataset);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Director decisions project_slug must match the target project");
+  }
+
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.project_id !== identity.id) {
+    throw new ProjectStoreError("Director decisions project_id must match the target project identity");
+  }
+
+  writeJson(join(resolveProjectDirectory(slug, cwd), DIRECTOR_DECISIONS_RELATIVE_PATH), parsed);
 }
 
 /**
