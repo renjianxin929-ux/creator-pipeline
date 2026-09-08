@@ -19,6 +19,7 @@ export { augmentEditPlanWithDirection } from "./apply-to-edit.js";
 export type { DirectorEditAugmentation } from "./apply-to-edit.js";
 export {
   DIRECTOR_JOB_RELATIVE_PATH,
+  DIRECTOR_OUTPUT_RELATIVE_PATH,
   DirectorHandoffError,
   applyDirectorPlan,
   directorJobSchema,

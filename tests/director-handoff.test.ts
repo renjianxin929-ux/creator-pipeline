@@ -136,7 +136,8 @@ describe("P9.3C prepare director job", () => {
     expect(JSON.parse(readFileSync(contextPath, "utf8")).version).toBe(1);
     expect(job.context_path).toBe("plans/director-context.json");
     expect(job.expected_output_contract).toEqual({ kind: "director-plan", version: 1 });
-    expect(job.expected_output_path).toBe("plans/director-plan.json");
+    expect(job.expected_output_path).toBe("plans/director-output.json");
+    expect(job.expected_output_path).not.toBe("plans/director-plan.json");
     expect(context.script_text).toBe(FROZEN_TEXT);
   });
 
@@ -159,6 +160,13 @@ describe("P9.3C prepare director job", () => {
     const second = prepareDirectorJob("demo", cwd);
 
     expect(first.context).toEqual(second.context);
+    expect(first.job).toEqual(second.job);
+    expect(
+      readFileSync(join(cwd, "workspace", "projects", "demo", "plans", "director-context.json"), "utf8"),
+    ).toBe(`${JSON.stringify(first.context, null, 2)}\n`);
+    expect(
+      readFileSync(join(cwd, "workspace", "projects", "demo", "plans", "director-job.json"), "utf8"),
+    ).toBe(`${JSON.stringify(first.job, null, 2)}\n`);
   });
 
   it("requires a frozen script before preparing", () => {
@@ -270,6 +278,57 @@ describe("P9.3C import director plan", () => {
     const stored = readProjectDirectorPlan("demo", cwd);
     expect(stored?.segments[0]?.segment_id).toBe("seg_b");
     expect(JSON.stringify(stored)).not.toContain("external-director");
+  });
+
+  it("keeps invalid staging output away from the official plan store", () => {
+    const { cwd } = setupProject();
+    const { context, job } = prepareDirectorJob("demo", cwd);
+
+    importDirectorPlan(
+      "demo",
+      writeExternalPlan(cwd, "official-source.json", planForContext(context, [proofSegment()])),
+      cwd,
+    );
+    const officialBefore = readFileSync(
+      join(cwd, "workspace", "projects", "demo", "plans", "director-plan.json"),
+      "utf8",
+    );
+
+    // The external agent delivers to the staging path from its job envelope.
+    expect(job.expected_output_path).toBe("plans/director-output.json");
+    const stagingPath = join(cwd, "workspace", "projects", "demo", job.expected_output_path);
+    writeFileSync(stagingPath, JSON.stringify({ version: 1, nonsense: true }), "utf8");
+
+    expect(() => importDirectorPlan("demo", stagingPath, cwd)).toThrow();
+    expect(
+      readFileSync(join(cwd, "workspace", "projects", "demo", "plans", "director-plan.json"), "utf8"),
+    ).toBe(officialBefore);
+  });
+
+  it("rejects imports against a frozen-stale context", () => {
+    const { cwd } = setupProject();
+    const { context } = prepareDirectorJob("demo", cwd);
+
+    writeProjectFrozenScript("demo", CHANGED_TEXT, cwd);
+    const staleMatchingPlan = planForContext(context, [proofSegment()]);
+    expect(() =>
+      importDirectorPlan("demo", writeExternalPlan(cwd, "stale.json", staleMatchingPlan), cwd),
+    ).toThrow(/prepare/);
+    expect(readProjectDirectorPlan("demo", cwd)).toBeUndefined();
+  });
+
+  it("rejects imports against a style-stale context", () => {
+    const { cwd, identity } = setupProject();
+    const { context } = prepareDirectorJob("demo", cwd);
+
+    const drifted = { ...context, style_version: "9.9" };
+    writeProjectDirectorContext("demo", drifted, cwd);
+    const matchingDrift = planForContext(drifted, [proofSegment()]);
+    expect(identity.id).toBe(drifted.project_id);
+    expect(() =>
+      importDirectorPlan("demo", writeExternalPlan(cwd, "drifted.json", matchingDrift), cwd),
+    ).toThrow(/prepare/);
+    expect(readProjectDirectorPlan("demo", cwd)).toBeUndefined();
   });
 });
 
