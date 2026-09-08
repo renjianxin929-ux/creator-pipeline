@@ -34,6 +34,29 @@ function cameraRecord() {
   };
 }
 
+function audioRecord() {
+  const sha256 = "d".repeat(64);
+  return {
+    id: `sha256:${sha256}`,
+    sha256,
+    byte_size: 8,
+    path: "raw/audio/voice.mp3",
+    kind: "audio" as const,
+  };
+}
+
+function generatedAssetRecord() {
+  return {
+    asset_id: "asset_009",
+    type: "video" as const,
+    source: "manual" as const,
+    role: "concept_broll",
+    path: "assets/generated/a.mp4",
+    has_watermark: false,
+    generation: { attempt: 1, cash_cost_cny: 0, subscription_quota_used: false },
+  };
+}
+
 function baseTranscript() {
   return {
     source_media_id: `sha256:${"c".repeat(64)}`,
@@ -193,6 +216,51 @@ describe("P9.3A director context contract", () => {
       status: "CANDIDATE",
       severity: "HARD",
     });
+  });
+
+  it("keeps lifecycle and severity orthogonal across all four combinations", () => {
+    const context = compileWith({
+      styleSnapshot: {
+        ...emptySnapshot(),
+        quality_gates: {
+          version: 1,
+          style_version: "1.0",
+          items: [
+            qualityGate({ id: "quality.proof.quad-frozen-hard", status: "FROZEN", severity: "HARD" }),
+            qualityGate({
+              id: "quality.proof.quad-frozen-advisory",
+              status: "FROZEN",
+              severity: "ADVISORY",
+            }),
+            qualityGate({
+              id: "quality.proof.quad-observed-hard",
+              status: "OBSERVED",
+              severity: "HARD",
+            }),
+            qualityGate({
+              id: "quality.proof.quad-candidate-hard",
+              status: "CANDIDATE",
+              severity: "HARD",
+            }),
+          ],
+        },
+      },
+    });
+
+    const ids = (entries: readonly { item: { id: string } }[]) =>
+      entries.map((entry) => entry.item.id);
+    expect(ids(context.style_guidance.mandatory_constraints)).toEqual([
+      "quality.proof.quad-frozen-hard",
+    ]);
+    expect(ids(context.style_guidance.approved_advisories)).toEqual([
+      "quality.proof.quad-frozen-advisory",
+    ]);
+    expect(ids(context.style_guidance.strong_guidance)).toEqual([
+      "quality.proof.quad-observed-hard",
+    ]);
+    expect(ids(context.style_guidance.optional_candidates)).toEqual([
+      "quality.proof.quad-candidate-hard",
+    ]);
   });
 
   it("admits a FROZEN HARD gate into mandatory constraints", () => {
@@ -389,12 +457,59 @@ describe("P9.3A determinism and staleness", () => {
     const context = compileWith();
     const changed = sha256Bytes(Buffer.from("# Changed\n", "utf8"));
 
-    expect(isDirectorContextStale(context, context.frozen_script.sha256, "1.0")).toBe(false);
-    expect(isDirectorContextStale(context, changed, "1.0")).toBe(true);
+    expect(isDirectorContextStale(context, baseProject(), context.frozen_script.sha256, "1.0")).toBe(
+      false,
+    );
+    expect(isDirectorContextStale(context, baseProject(), changed, "1.0")).toBe(true);
   });
 
   it("retires the context when the style version changes", () => {
     const context = compileWith();
-    expect(isDirectorContextStale(context, context.frozen_script.sha256, "1.1")).toBe(true);
+    expect(isDirectorContextStale(context, baseProject(), context.frozen_script.sha256, "1.1")).toBe(
+      true,
+    );
+  });
+
+  it("retires the context against a different project identity", () => {
+    const context = compileWith();
+
+    expect(
+      isDirectorContextStale(
+        context,
+        { ...baseProject(), id: "proj-other-9" },
+        context.frozen_script.sha256,
+        "1.0",
+      ),
+    ).toBe(true);
+    expect(
+      isDirectorContextStale(
+        context,
+        { ...baseProject(), slug: "other" },
+        context.frozen_script.sha256,
+        "1.0",
+      ),
+    ).toBe(true);
+  });
+
+  it("proves talking footage only with real camera media", () => {
+    const audioOnly = compileWith({ mediaRecords: [audioRecord()] });
+    expect(audioOnly.media_assets.availability.has_talking_footage).toBe(false);
+    expect(audioOnly.media_assets.availability.has_audio).toBe(true);
+
+    const withCamera = compileWith({ mediaRecords: [cameraRecord()] });
+    expect(withCamera.media_assets.availability.has_talking_footage).toBe(true);
+  });
+
+  it("detects generated assets from generation metadata, not vendor names", () => {
+    const generated = compileWith({ assetRecords: [generatedAssetRecord()] });
+    expect(generated.media_assets.availability.has_generated_asset).toBe(true);
+
+    const collected = compileWith({
+      assetRecords: [{ ...generatedAssetRecord(), generation: undefined }],
+    });
+    expect(collected.media_assets.availability.has_generated_asset).toBe(false);
+    expect(JSON.stringify(generatedAssetRecord())).not.toMatch(
+      /(asta|gpt|claude|codex|hyperframes|remotion|ffmpeg|opencut|smartsub|video-?use|openmontage)/i,
+    );
   });
 });

@@ -98,6 +98,7 @@ export type UnknownStyle = z.infer<typeof unknownStyleSchema>;
 export const styleGuidanceSchema = z
   .object({
     mandatory_constraints: z.array(styleGuidanceItemSchema).default([]),
+    approved_advisories: z.array(styleGuidanceItemSchema).default([]),
     strong_guidance: z.array(styleGuidanceItemSchema).default([]),
     optional_candidates: z.array(styleGuidanceItemSchema).default([]),
     unknown_or_unset: z.array(unknownStyleSchema).default([]),
@@ -157,6 +158,7 @@ export const mediaAvailabilitySchema = z
     has_screen_demo: z.boolean(),
     has_screenshot_image: z.boolean(),
     has_generated_asset: z.boolean(),
+    has_audio: z.boolean(),
   })
   .strict();
 export type MediaAvailability = z.infer<typeof mediaAvailabilitySchema>;

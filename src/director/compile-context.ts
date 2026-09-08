@@ -41,8 +41,6 @@ export interface CompileDirectorContextInput {
   assetRecords?: readonly AssetManifestRecord[];
 }
 
-const GENERATED_ASSET_SOURCES = new Set(["grok_ui", "grok_api", "minimax_api", "omni_ui"]);
-
 const GUIDANCE_DOMAINS: readonly GuidanceDomain[] = [
   "editing-grammar",
   "visual-grammar",
@@ -78,6 +76,7 @@ export function compileDirectorContext(input: CompileDirectorContextInput): Dire
   };
 
   const mandatory: StyleGuidanceItem[] = [];
+  const advisories: StyleGuidanceItem[] = [];
   const strong: StyleGuidanceItem[] = [];
   const optional: StyleGuidanceItem[] = [];
   const unknownOrUnset: DirectorContext["style_guidance"]["unknown_or_unset"] = [];
@@ -108,10 +107,16 @@ export function compileDirectorContext(input: CompileDirectorContextInput): Dire
   for (const domain of GUIDANCE_DOMAINS) {
     const unsetIds: string[] = [];
     for (const entry of domainItems[domain]) {
-      // The stored status alone decides the tier. Severity never upgrades:
-      // an OBSERVED/CANDIDATE HARD gate keeps its lifecycle strength.
+      // Lifecycle and severity stay orthogonal. The stored status alone
+      // decides the tier, and severity never upgrades it: FROZEN is the only
+      // path into mandatory, and only with HARD severity — a FROZEN
+      // ADVISORY gate is approved guidance, not a hard constraint.
       if (entry.item.status === "FROZEN") {
-        mandatory.push(entry);
+        if (entry.domain === "quality-gates" && entry.item.severity === "ADVISORY") {
+          advisories.push(entry);
+        } else {
+          mandatory.push(entry);
+        }
       } else if (entry.item.status === "OBSERVED") {
         strong.push(entry);
       } else if (entry.item.status === "CANDIDATE") {
@@ -126,14 +131,20 @@ export function compileDirectorContext(input: CompileDirectorContextInput): Dire
   }
 
   const availability = {
-    has_talking_footage: mediaRecords.some(
-      (record) => record.kind === "camera" || record.kind === "audio",
-    ),
+    // Talking footage requires real visual camera media. Audio alone never
+    // proves a talking head exists; it is reported separately as has_audio.
+    has_talking_footage: mediaRecords.some((record) => record.kind === "camera"),
     has_screen_demo: mediaRecords.some((record) => record.kind === "screen"),
     has_screenshot_image:
       mediaRecords.some((record) => record.kind === "image") ||
       assetRecords.some((asset) => asset.type === "image"),
-    has_generated_asset: assetRecords.some((asset) => GENERATED_ASSET_SOURCES.has(asset.source)),
+    // Provider-independent: any asset carrying generation metadata is a
+    // generated asset, regardless of which provider produced it. New
+    // providers need no compiler change as long as they record metadata.
+    has_generated_asset: assetRecords.some((asset) => asset.generation !== undefined),
+    has_audio:
+      mediaRecords.some((record) => record.kind === "audio") ||
+      assetRecords.some((asset) => asset.type === "audio"),
   };
 
   const knownUnknowns: DirectorContext["known_unknowns"] = [];
@@ -167,6 +178,12 @@ export function compileDirectorContext(input: CompileDirectorContextInput): Dire
       detail: "No generated asset is available.",
     });
   }
+  if (!availability.has_audio) {
+    knownUnknowns.push({
+      area: "media.audio",
+      detail: "No audio track is available.",
+    });
+  }
 
   return parseDirectorContext({
     version: 1,
@@ -186,6 +203,7 @@ export function compileDirectorContext(input: CompileDirectorContextInput): Dire
     media_assets: { records: mediaRecords, assets: assetRecords, availability },
     style_guidance: {
       mandatory_constraints: mandatory,
+      approved_advisories: advisories,
       strong_guidance: strong,
       optional_candidates: optional,
       unknown_or_unset: unknownOrUnset,
@@ -200,17 +218,26 @@ export function compileDirectorContext(input: CompileDirectorContextInput): Dire
 }
 
 /**
- * Staleness for compiled contexts. A frozen-script byte change or a style
- * version change each independently retire a previously valid context.
- * This reuses the P9.1 byte-identity mechanism and never weakens it.
+ * Staleness for compiled contexts. A context is bound to one project, one
+ * frozen-script byte identity, and one style version: a change in any of
+ * the three — or a context evaluated against a different project —
+ * independently retires it. This reuses the P9.1 byte-identity mechanism
+ * and never weakens it.
  */
 export function isDirectorContextStale(
   contextInput: DirectorContext,
+  currentProject: ProjectIdentity,
   currentFrozenSha256: string,
   currentStyleVersion: string,
 ): boolean {
   const context = directorContextSchema.parse(contextInput);
+  const project = projectIdentitySchema.parse(currentProject);
   const currentSha = sha256Schema.parse(currentFrozenSha256);
   const currentStyle = brandVersionSchema.parse(currentStyleVersion);
-  return context.frozen_script.sha256 !== currentSha || context.style_version !== currentStyle;
+  return (
+    context.project_id !== project.id ||
+    context.project_slug !== project.slug ||
+    context.frozen_script.sha256 !== currentSha ||
+    context.style_version !== currentStyle
+  );
 }
