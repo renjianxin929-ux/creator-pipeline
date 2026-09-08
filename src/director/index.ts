@@ -17,3 +17,13 @@ export type {
 } from "./validate-plan.js";
 export { augmentEditPlanWithDirection } from "./apply-to-edit.js";
 export type { DirectorEditAugmentation } from "./apply-to-edit.js";
+export {
+  DIRECTOR_JOB_RELATIVE_PATH,
+  DirectorHandoffError,
+  applyDirectorPlan,
+  directorJobSchema,
+  importDirectorPlan,
+  prepareDirectorJob,
+  readDirectorJob,
+} from "./handoff.js";
+export type { DirectorJob, PreparedDirectorJob } from "./handoff.js";

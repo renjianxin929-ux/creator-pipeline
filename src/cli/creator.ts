@@ -4,6 +4,7 @@ import { runDoctor } from "./doctor.js";
 import { planProjectAssets } from "../assets/asset-planner.js";
 import { generateProjectAssets } from "../assets/generate-assets.js";
 import { resolveProjectBrand } from "../brand/project-brand.js";
+import { applyDirectorPlan, importDirectorPlan, prepareDirectorJob } from "../director/handoff.js";
 import { planProjectEdit } from "../edit/edit-planner.js";
 import { exportApprovedPackage } from "../export/export-approved-package.js";
 import { ingestMedia } from "../ingest/ingest-media.js";
@@ -26,6 +27,9 @@ Usage:
   creator transcribe <slug>
   creator assets plan <slug>
   creator assets generate <slug>
+  creator director prepare <slug>
+  creator director import <slug> <director-plan.json>
+  creator director apply <slug>
   creator edit plan <slug>
   creator render preview <slug>
   creator approve <slug>
@@ -63,6 +67,8 @@ async function main(arguments_: readonly string[]): Promise<number> {
         return transcribe(argumentsForCommand[0]!);
       case "assets":
         return assets(argumentsForCommand);
+      case "director":
+        return director(argumentsForCommand);
       case "edit":
         return edit(argumentsForCommand);
       case "render":
@@ -188,6 +194,41 @@ function edit(argumentsForCommand: readonly string[]): number {
   const plan = planProjectEdit(slug);
   write(`EDIT_PLAN_READY ${slug} ${plan.timeline.length}`);
   return 0;
+}
+
+function director(argumentsForCommand: readonly string[]): number {
+  const [subcommand, slug, planPath, ...remaining] = argumentsForCommand;
+
+  switch (subcommand) {
+    case "prepare": {
+      if (slug === undefined || planPath !== undefined || remaining.length !== 0) {
+        throw new CliError("Usage: creator director prepare <slug>");
+      }
+      prepareDirectorJob(slug);
+      write(`DIRECTOR_CONTEXT_READY ${slug} plans/director-context.json`);
+      return 0;
+    }
+    case "import": {
+      if (slug === undefined || planPath === undefined || remaining.length !== 0) {
+        throw new CliError("Usage: creator director import <slug> <director-plan.json>");
+      }
+      const plan = importDirectorPlan(slug, planPath);
+      write(`DIRECTOR_PLAN_IMPORTED ${slug} ${plan.segments.length}`);
+      return 0;
+    }
+    case "apply": {
+      if (slug === undefined || planPath !== undefined || remaining.length !== 0) {
+        throw new CliError("Usage: creator director apply <slug>");
+      }
+      const result = applyDirectorPlan(slug);
+      write(`DIRECTOR_APPLIED ${slug} ${result.plan.timeline.length}`);
+      return 0;
+    }
+    default:
+      throw new CliError(
+        "Usage: creator director <prepare|import|apply> <slug> [director-plan.json]",
+      );
+  }
 }
 
 async function render(argumentsForCommand: readonly string[]): Promise<number> {

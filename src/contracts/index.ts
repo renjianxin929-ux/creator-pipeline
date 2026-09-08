@@ -290,6 +290,7 @@ export {
   type StyleOsSnapshot,
 } from "./style-snapshot.js";
 export {
+  DIRECTOR_CONTEXT_RELATIVE_PATH,
   DIRECTOR_HARD_CONSTRAINTS,
   directorContextSchema,
   directorOutputContractSchema,

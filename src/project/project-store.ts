@@ -8,7 +8,9 @@ import { sha256Bytes } from "./file-hash.js";
 import {
   assetManifestSchema,
   assetPlanSchema,
+  DIRECTOR_CONTEXT_RELATIVE_PATH,
   DIRECTOR_PLAN_RELATIVE_PATH,
+  directorContextSchema,
   directorPlanSchema,
   FROZEN_SCRIPT_RELATIVE_PATH,
   editPlanSchema,
@@ -30,6 +32,7 @@ import {
   silenceMapSchema,
   transcriptDocumentSchema,
   assertTransition,
+  type DirectorContext,
   type DirectorPlan,
   type EventRecord,
   type AssetManifest,
@@ -625,6 +628,56 @@ export function readProjectFrozenScriptIdentity(
 
   const bytes = Buffer.from(content, "utf8");
   return { sha256: sha256Bytes(bytes), byte_size: bytes.byteLength };
+}
+
+export function readProjectDirectorContext(
+  slugInput: string,
+  cwd = process.cwd(),
+): DirectorContext | undefined {
+  const slug = requireSlug(slugInput);
+  const contextPath = join(resolveProjectDirectory(slug, cwd), DIRECTOR_CONTEXT_RELATIVE_PATH);
+
+  if (!existsSync(contextPath)) {
+    return undefined;
+  }
+
+  let rawContext: unknown;
+  try {
+    rawContext = JSON.parse(readFileSync(contextPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid director context for: ${slug}`);
+  }
+
+  const parsed = directorContextSchema.safeParse(rawContext);
+  if (!parsed.success || parsed.data.project_slug !== slug) {
+    throw new ProjectStoreError(`Invalid director context for: ${slug}`);
+  }
+
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.data.project_id !== identity.id) {
+    throw new ProjectStoreError(`Invalid director context for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function writeProjectDirectorContext(
+  slugInput: string,
+  context: DirectorContext,
+  cwd = process.cwd(),
+): void {
+  const slug = requireSlug(slugInput);
+  const parsed = directorContextSchema.parse(context);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Director context project_slug must match the target project");
+  }
+
+  const identity = readProjectIdentity(slug, cwd);
+  if (parsed.project_id !== identity.id) {
+    throw new ProjectStoreError("Director context project_id must match the target project identity");
+  }
+
+  writeJson(join(resolveProjectDirectory(slug, cwd), DIRECTOR_CONTEXT_RELATIVE_PATH), parsed);
 }
 
 export function readProjectDirectorPlan(slugInput: string, cwd = process.cwd()): DirectorPlan | undefined {

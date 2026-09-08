@@ -33,6 +33,9 @@ import { transcriptDocumentSchema } from "./transcript.js";
  * for a concrete model belongs to that model's future provider adapter.
  */
 
+/** Project-relative path of the compiled DirectorContext work pack. */
+export const DIRECTOR_CONTEXT_RELATIVE_PATH = "plans/director-context.json";
+
 const vendorPattern = /(asta|gpt|claude|codex|hyperframes|remotion|ffmpeg|opencut|smartsub|video-?use|openmontage)/i;
 
 function rejectVendor(value: string): boolean {

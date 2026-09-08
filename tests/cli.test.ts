@@ -201,6 +201,98 @@ describe("creator CLI", () => {
     expect(JSON.parse(readFileSync(statePath, "utf8"))).toEqual({ status: "PREVIEW_READY" });
     expect(existsSync(approvalPath)).toBe(false);
   });
+
+  it("hands a director job to an external agent and applies the returned plan", () => {
+    const cwd = createTemporaryDirectory();
+    writeFileSync(
+      join(cwd, "creator.config.json"),
+      JSON.stringify({ workspace: "./temporary-workspace" }),
+      "utf8",
+    );
+    expect(runCreator(cwd, ["init", "demo"]).status).toBe(0);
+
+    const projectDirectory = join(cwd, "temporary-workspace", "projects", "demo");
+    const frozenText = "# Demo\n\nLine two.\n";
+    writeFileSync(join(projectDirectory, "content", "frozen-script.md"), frozenText, "utf8");
+
+    const prepared = runCreator(cwd, ["director", "prepare", "demo"]);
+    expect(prepared.status).toBe(0);
+    expect(prepared.stdout).toContain("DIRECTOR_CONTEXT_READY demo");
+    const storedContext = JSON.parse(
+      readFileSync(join(projectDirectory, "plans", "director-context.json"), "utf8"),
+    ) as {
+      project_slug: string;
+      project_id: string;
+      frozen_script: { sha256: string; byte_size: number };
+      style_version: string;
+    };
+    expect(storedContext.project_slug).toBe("demo");
+
+    const externalPlan = {
+      version: 1,
+      project_slug: storedContext.project_slug,
+      project_id: storedContext.project_id,
+      frozen_script: {
+        path: "content/frozen-script.md",
+        sha256: storedContext.frozen_script.sha256,
+        byte_size: storedContext.frozen_script.byte_size,
+      },
+      style_reference: { style_version: storedContext.style_version },
+      segments: [
+        {
+          segment_id: "seg_01",
+          script_anchor: { start_line: 1, end_line: 1 },
+          semantic_role: "HOOK",
+          primary_visual: "visual.hook.talking-head",
+          allowed_visuals: ["visual.hook.talking-head"],
+          caption_mode: "default",
+          reason: "External director fixture.",
+          confidence: 0.7,
+        },
+      ],
+    };
+    const externalPlanPath = join(cwd, "external-plan.json");
+    writeFileSync(externalPlanPath, JSON.stringify(externalPlan, null, 2), "utf8");
+
+    const imported = runCreator(cwd, ["director", "import", "demo", externalPlanPath]);
+    expect(imported.status).toBe(0);
+    expect(imported.stdout).toContain("DIRECTOR_PLAN_IMPORTED demo 1");
+
+    writeFileSync(
+      join(projectDirectory, "plans", "edit-plan.json"),
+      JSON.stringify({
+        version: 1,
+        format: "9:16",
+        timeline: [
+          {
+            id: "clip_001",
+            source: "raw/camera/talk.mp4",
+            source_start_ms: 0,
+            source_end_ms: 2000,
+            layout: "layout.talking-head",
+            caption: false,
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const applied = runCreator(cwd, ["director", "apply", "demo"]);
+    expect(applied.status).toBe(0);
+    expect(applied.stdout).toContain("DIRECTOR_APPLIED demo 1");
+    expect(
+      (JSON.parse(readFileSync(join(projectDirectory, "plans", "edit-plan.json"), "utf8")) as {
+        timeline: { id: string }[];
+      }).timeline.map((clip) => clip.id),
+    ).toEqual(["clip_001"]);
+
+    const reimported = runCreator(cwd, ["director", "import", "demo", externalPlanPath]);
+    expect(reimported.status).toBe(0);
+
+    writeFileSync(join(cwd, "bad-plan.json"), '{"version":1}\n', "utf8");
+    const invalid = runCreator(cwd, ["director", "import", "demo", join(cwd, "bad-plan.json")]);
+    expect(invalid.status).toBe(1);
+  });
 });
 
 function createTemporaryDirectory(): string {
