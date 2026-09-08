@@ -4,13 +4,20 @@ import { join, resolve } from "node:path";
 import { z } from "zod";
 
 import { loadCurrentBrandKit } from "../brand/loader.js";
+import { sha256Bytes } from "./file-hash.js";
 import {
   assetManifestSchema,
   assetPlanSchema,
+  DIRECTOR_DECISIONS_RELATIVE_PATH,
+  DIRECTOR_PLAN_RELATIVE_PATH,
+  directorDecisionsFileSchema,
+  directorPlanSchema,
+  FROZEN_SCRIPT_RELATIVE_PATH,
   editPlanSchema,
   createDefaultProjectGenerationBudget,
   createInitialState,
   eventRecordSchema,
+  isDirectorPlanStale,
   mediaRecordListSchema,
   mediaRecordSchema,
   publishPlanSchema,
@@ -25,6 +32,8 @@ import {
   silenceMapSchema,
   transcriptDocumentSchema,
   assertTransition,
+  type DirectorDecisionsFile,
+  type DirectorPlan,
   type EventRecord,
   type AssetManifest,
   type AssetPlan,
@@ -561,6 +570,161 @@ export function writeProjectTranscriptionArtifacts(
   writeJson(join(derivedDirectory, "transcript.json"), parsedTranscript);
   writeFileSync(join(derivedDirectory, "transcript.srt"), renderSrt(parsedTranscript.segments), "utf8");
   writeJson(join(derivedDirectory, "silence-map.json"), parsedSilenceMap);
+}
+
+export interface FrozenScriptIdentity {
+  sha256: string;
+  byte_size: number;
+}
+
+/**
+ * Reads the human-readable frozen script. Markdown is the authoring surface
+ * only: the runtime identity is the byte hash, never the prose itself.
+ */
+export function readProjectFrozenScript(slugInput: string, cwd = process.cwd()): string | undefined {
+  const slug = requireSlug(slugInput);
+  const frozenScriptPath = join(resolveProjectDirectory(slug, cwd), FROZEN_SCRIPT_RELATIVE_PATH);
+
+  if (!existsSync(frozenScriptPath)) {
+    return undefined;
+  }
+
+  return readFileSync(frozenScriptPath, "utf8");
+}
+
+/**
+ * Persists the frozen script bytes and returns their deterministic identity.
+ * The same bytes always produce the same identity; any byte change produces
+ * a different one. Initialization semantics are untouched: this never creates
+ * a project directory, it only writes inside an existing one.
+ */
+export function writeProjectFrozenScript(
+  slugInput: string,
+  content: string,
+  cwd = process.cwd(),
+): FrozenScriptIdentity {
+  const slug = requireSlug(slugInput);
+  if (content.trim().length === 0) {
+    throw new ProjectStoreError("Frozen script must not be empty");
+  }
+
+  const bytes = Buffer.from(content, "utf8");
+  const identity = { sha256: sha256Bytes(bytes), byte_size: bytes.byteLength };
+  const frozenScriptPath = join(resolveProjectDirectory(slug, cwd), FROZEN_SCRIPT_RELATIVE_PATH);
+  mkdirSync(join(resolveProjectDirectory(slug, cwd), "content"), { recursive: true });
+  writeFileSync(frozenScriptPath, content, "utf8");
+  return identity;
+}
+
+/** Returns the current frozen-script byte identity, or undefined when absent. */
+export function readProjectFrozenScriptIdentity(
+  slugInput: string,
+  cwd = process.cwd(),
+): FrozenScriptIdentity | undefined {
+  const content = readProjectFrozenScript(slugInput, cwd);
+  if (content === undefined) {
+    return undefined;
+  }
+
+  const bytes = Buffer.from(content, "utf8");
+  return { sha256: sha256Bytes(bytes), byte_size: bytes.byteLength };
+}
+
+export function readProjectDirectorPlan(slugInput: string, cwd = process.cwd()): DirectorPlan | undefined {
+  const slug = requireSlug(slugInput);
+  const planPath = join(resolveProjectDirectory(slug, cwd), DIRECTOR_PLAN_RELATIVE_PATH);
+
+  if (!existsSync(planPath)) {
+    return undefined;
+  }
+
+  let rawPlan: unknown;
+  try {
+    rawPlan = JSON.parse(readFileSync(planPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid director plan for: ${slug}`);
+  }
+
+  const parsed = directorPlanSchema.safeParse(rawPlan);
+  if (!parsed.success || parsed.data.project_slug !== slug) {
+    throw new ProjectStoreError(`Invalid director plan for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function writeProjectDirectorPlan(slugInput: string, plan: DirectorPlan, cwd = process.cwd()): void {
+  const slug = requireSlug(slugInput);
+  const parsed = directorPlanSchema.parse(plan);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Director plan project_slug must match the target project");
+  }
+
+  writeJson(join(resolveProjectDirectory(slug, cwd), DIRECTOR_PLAN_RELATIVE_PATH), parsed);
+}
+
+/**
+ * Deterministic staleness: compares the plan's frozen-script hash against the
+ * current frozen-script bytes. A missing frozen script means the plan can no
+ * longer be verified, so it reports stale. Throws when no plan exists.
+ */
+export function isProjectDirectorPlanStale(slugInput: string, cwd = process.cwd()): boolean {
+  const slug = requireSlug(slugInput);
+  const plan = readProjectDirectorPlan(slug, cwd);
+  if (plan === undefined) {
+    throw new ProjectStoreError(`Director plan does not exist for: ${slug}`);
+  }
+
+  const identity = readProjectFrozenScriptIdentity(slug, cwd);
+  if (identity === undefined) {
+    return true;
+  }
+
+  return isDirectorPlanStale(plan, identity.sha256);
+}
+
+/**
+ * Minimal P9.1 persistence for `review/director-decisions.json`. Full review
+ * semantics, metrics, and Style OS promotion gates are P9.4 scope.
+ */
+export function readProjectDirectorDecisions(
+  slugInput: string,
+  cwd = process.cwd(),
+): DirectorDecisionsFile | undefined {
+  const slug = requireSlug(slugInput);
+  const decisionsPath = join(resolveProjectDirectory(slug, cwd), DIRECTOR_DECISIONS_RELATIVE_PATH);
+
+  if (!existsSync(decisionsPath)) {
+    return undefined;
+  }
+
+  let rawDecisions: unknown;
+  try {
+    rawDecisions = JSON.parse(readFileSync(decisionsPath, "utf8"));
+  } catch {
+    throw new ProjectStoreError(`Unable to read valid director decisions for: ${slug}`);
+  }
+
+  const parsed = directorDecisionsFileSchema.safeParse(rawDecisions);
+  if (!parsed.success || parsed.data.project_slug !== slug) {
+    throw new ProjectStoreError(`Invalid director decisions for: ${slug}`);
+  }
+
+  return parsed.data;
+}
+
+export function writeProjectDirectorDecisions(
+  slugInput: string,
+  decisions: DirectorDecisionsFile,
+  cwd = process.cwd(),
+): void {
+  const slug = requireSlug(slugInput);
+  const parsed = directorDecisionsFileSchema.parse(decisions);
+  if (parsed.project_slug !== slug) {
+    throw new ProjectStoreError("Director decisions project_slug must match the target project");
+  }
+
+  writeJson(join(resolveProjectDirectory(slug, cwd), DIRECTOR_DECISIONS_RELATIVE_PATH), parsed);
 }
 
 function requireSlug(input: string): string {
