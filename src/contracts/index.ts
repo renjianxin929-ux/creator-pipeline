@@ -281,7 +281,6 @@ export {
   parseStyleOsSnapshot,
   selectDurableTruth,
   selectItemsByStatus,
-  selectRenPreferences,
   styleOsSnapshotSchema,
   type StyleOsSnapshot,
 } from "./style-snapshot.js";

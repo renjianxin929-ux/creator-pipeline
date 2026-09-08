@@ -8,7 +8,6 @@ import { loadStyleOS } from "../src/brand/style-os.ts";
 import {
   selectDurableTruth,
   selectItemsByStatus,
-  selectRenPreferences,
 } from "../src/contracts/index.ts";
 import * as styleOsModule from "../src/brand/style-os.ts";
 import * as styleSnapshotModule from "../src/contracts/style-snapshot.ts";
@@ -227,22 +226,47 @@ describe("P9.2D lifecycle preservation and query boundary", () => {
     ]);
   });
 
-  it("excludes UNSET items from REN preferences even with specific text", () => {
+  it("reads UNSET items explicitly without treating them as truth", () => {
     const cwd = copyRepoBrand();
     const snapshot = loadStyleOS("1.0", cwd);
 
     const unsetMotion = selectItemsByStatus(snapshot.motion_library.items, "UNSET");
     expect(unsetMotion).toHaveLength(1);
-    expect(selectRenPreferences(snapshot.motion_library.items)).toEqual([]);
     expect(selectDurableTruth(snapshot.motion_library.items)).toEqual([]);
   });
 
-  it("never treats CANDIDATE as durable truth", () => {
+  it("reads each lifecycle status separately", () => {
+    const cwd = copyRepoBrand();
+    writeStyleFile(
+      cwd,
+      "editing-grammar.json",
+      editingFile(
+        (["UNSET", "CANDIDATE", "OBSERVED", "FROZEN"] as const).map((status, index) => ({
+          id: `editing.proof.status-${index + 1}`,
+          status,
+          applies_to: ["PROOF"],
+          rule: `Status probe ${index + 1}.`,
+          allowed_visuals: ["visual.proof.real-demo"],
+          why: "Schema coverage.",
+        })),
+      ),
+    );
+    const snapshot = loadStyleOS("1.0", cwd);
+
+    for (const status of ["UNSET", "CANDIDATE", "OBSERVED", "FROZEN"] as const) {
+      expect(selectItemsByStatus(snapshot.editing_grammar.items, status)).toHaveLength(1);
+    }
+    expect(selectDurableTruth(snapshot.editing_grammar.items).map((item) => item.id)).toEqual([
+      "editing.proof.status-4",
+    ]);
+  });
+
+  it("keeps CANDIDATE and OBSERVED out of durable truth", () => {
     const snapshot = loadStyleOS("1.0", copyRepoBrand());
 
     expect(selectDurableTruth(snapshot.editing_grammar.items)).toEqual([]);
-    expect(selectRenPreferences(snapshot.editing_grammar.items)).toHaveLength(1);
     expect(selectItemsByStatus(snapshot.editing_grammar.items, "CANDIDATE")).toHaveLength(1);
+    expect(selectItemsByStatus(snapshot.editing_grammar.items, "OBSERVED")).toHaveLength(0);
   });
 
   it("keeps a FROZEN reference from mutating linked rule status", () => {
@@ -305,7 +329,7 @@ describe("P9.2D determinism and immutability", () => {
 });
 
 describe("P9.2D neutral seed", () => {
-  it("ships exactly the minimal seed and nothing Founder-unapproved", () => {
+  it("ships minimal seed without claiming Founder approval", () => {
     const snapshot = loadStyleOS("1.0");
 
     expect(snapshot.editing_grammar.items).toHaveLength(1);

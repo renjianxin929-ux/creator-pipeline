@@ -88,14 +88,14 @@ export type {
 /* ------------------------------------------------------------------ */
 
 /**
- * Read-only status filters for downstream consumers. All three preserve
+ * Read-only status filters for downstream consumers. Both helpers preserve
  * every item's stored status and mutate nothing:
  * - FROZEN items are the only durable Founder truth.
  * - OBSERVED items are strong evidence / recommendations only.
  * - CANDIDATE items are optional suggestions only.
- * - UNSET items must never be represented as a REN preference — even when
- *   their rule text is specific. They are known placeholders for unknown
- *   preferences (see the P9.2B architect note).
+ * - UNSET items are unknown preferences (known placeholders, never truth).
+ * P9.3 must decide usage strength explicitly per status; no aggregate
+ * "preference" helper is provided here by design.
  */
 export function selectItemsByStatus<TItem extends { status: StyleLifecycleStatus }>(
   items: readonly TItem[],
@@ -110,14 +110,4 @@ export function selectDurableTruth<TItem extends { status: StyleLifecycleStatus 
   items: readonly TItem[],
 ): TItem[] {
   return selectItemsByStatus(items, "FROZEN");
-}
-
-/**
- * REN preferences: every item except UNSET. An UNSET item — however
- * specific its text — is always excluded.
- */
-export function selectRenPreferences<TItem extends { status: StyleLifecycleStatus }>(
-  items: readonly TItem[],
-): TItem[] {
-  return items.filter((item) => item.status !== "UNSET");
 }
